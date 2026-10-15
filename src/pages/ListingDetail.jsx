@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { toWhatsApp, formatTag, periodLabel, distanceKm, formatDistance } from '../utils/helpers';
@@ -21,6 +21,7 @@ export default function ListingDetail() {
   const [contacting, setContacting] = useState(false);
   const [contactError, setContactError] = useState('');
   const [dist, setDist] = useState({ state: 'idle', km: null });
+  const touchX = useRef(null); // where a finger touched down (for swiping)
 
   // 1. Load the listing (and who is logged in)
   useEffect(() => {
@@ -61,7 +62,8 @@ export default function ListingDetail() {
   // 3. Get the number from the database only when the button is clicked
   async function handleContact() {
     setContactError('');
-    if (!user) return navigate('/login');
+    // Not logged in: go to login, and come back to THIS listing afterwards
+    if (!user) return navigate('/login', { state: { from: { pathname: `/listing/${id}` } } });
 
     // Open the tab immediately (browsers block pop-ups opened after a wait)
     const tab = window.open('about:blank', '_blank');
@@ -129,7 +131,18 @@ export default function ListingDetail() {
         {/* Left: gallery + description */}
         <div className="lg:col-span-2">
           <div className="overflow-hidden rounded-3xl border border-brand-100 bg-white shadow-sm">
-            <div className="relative aspect-[4/3] bg-gradient-to-br from-brand-100 to-brand-50">
+            <div
+              className="relative aspect-[4/3] bg-gradient-to-br from-brand-100 to-brand-50"
+              onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+              onTouchEnd={(e) => {
+                if (touchX.current === null || photos.length < 2) return;
+                const dx = e.changedTouches[0].clientX - touchX.current;
+                if (Math.abs(dx) > 50) {
+                  setActive((a) => (dx < 0 ? (a + 1) % photos.length : (a - 1 + photos.length) % photos.length));
+                }
+                touchX.current = null;
+              }}
+            >
               {photos.length > 0 ? (
                 <img src={photos[active]} alt={listing.title} className="h-full w-full object-cover" />
               ) : (
@@ -139,22 +152,33 @@ export default function ListingDetail() {
               {photos.length > 1 && (
                 <>
                   <button
+                    type="button"
                     onClick={() => setActive((active - 1 + photos.length) % photos.length)}
                     aria-label="Previous photo"
-                    className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow hover:bg-white"
-                  >←</button>
+                    className="gal-arrow gal-arrow--prev"
+                  >
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                         strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m15 5-7 7 7 7" />
+                    </svg>
+                  </button>
                   <button
+                    type="button"
                     onClick={() => setActive((active + 1) % photos.length)}
                     aria-label="Next photo"
-                    className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow hover:bg-white"
-                  >→</button>
+                    className="gal-arrow gal-arrow--next"
+                  >
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                         strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m9 5 7 7-7 7" />
+                    </svg>
+                  </button>
+                  <span className="gal-chip gal-chip--right">{active + 1} / {photos.length}</span>
                 </>
               )}
 
               {showCaptions && CAPTIONS[active] && (
-                <span className="absolute bottom-3 left-3 rounded-lg bg-brand-950/70 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-                  {CAPTIONS[active]}
-                </span>
+                <span className="gal-chip gal-chip--left">{CAPTIONS[active]}</span>
               )}
             </div>
 
@@ -216,7 +240,7 @@ export default function ListingDetail() {
 
             <p className="mt-4 rounded-xl bg-brand-50 p-3 text-xs leading-relaxed text-brand-900/75">
               <strong>Stay safe:</strong> see the room in person before you pay anything, and never send money to
-              someone you haven’t met.
+              someone you haven't met.
             </p>
           </div>
         </aside>

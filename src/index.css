@@ -641,3 +641,42 @@ a.logo, a.btn { text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
   .ticker__track, .sticker { animation: none; }
 }
+
+/* ===== Gallery arrows & chips ===== */
+.gal-arrow {
+  position: absolute; top: 50%; z-index: 2; width: 46px; height: 46px;
+  display: grid; place-items: center; transform: translateY(-50%);
+  border: 1.5px solid rgba(255, 255, 255, .75); border-radius: 50%;
+  background: rgba(255, 255, 255, .55); color: var(--ink);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 22px rgba(10, 30, 25, .22); cursor: pointer;
+  transition: transform .18s, background .18s, color .18s, border-color .18s;
+}
+.gal-arrow--prev { left: 14px; }
+.gal-arrow--next { right: 14px; }
+.gal-arrow svg { transition: transform .18s; }
+.gal-arrow:hover { border-color: var(--primary); background: var(--primary); color: #fff; transform: translateY(-50%) scale(1.1); }
+.gal-arrow--prev:hover svg { transform: translateX(-2px); }
+.gal-arrow--next:hover svg { transform: translateX(2px); }
+.gal-arrow:active { transform: translateY(-50%) scale(.94); }
+.gal-arrow:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+
+.gal-chip {
+  position: absolute; bottom: 14px; padding: 7px 13px; border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 999px; background: rgba(10, 30, 25, .55); color: #fff;
+  font-size: 12px; font-weight: 700; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.gal-chip--left { left: 14px; }
+.gal-chip--right { right: 14px; }
+
+/* Arrow on the listing cards: turns yellow and tilts up-right on hover */
+.card-arrow {
+  width: 40px; height: 40px; display: grid; place-items: center;
+  border: 2px solid var(--ink); border-radius: 50%; background: white; color: var(--ink);
+  transition: transform .25s, background .25s;
+}
+.listing-card:hover .card-arrow { background: var(--sun); transform: rotate(-45deg); }
+
+@media (max-width: 560px) {
+  .gal-arrow { width: 40px; height: 40px; }
+}
