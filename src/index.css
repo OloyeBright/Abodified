@@ -677,6 +677,19 @@ a.logo, a.btn { text-decoration: none; }
 }
 .listing-card:hover .card-arrow { background: var(--sun); transform: rotate(-45deg); }
 
+/* =====  card ===== */
+.safe-card { margin-top: 20px; padding: 20px; border: 2px solid var(--ink); border-radius: 18px; background: var(--butter); box-shadow: 5px 5px 0 var(--ink); }
+.safe-card__head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.safe-card__head span { width: 38px; height: 38px; display: grid; place-items: center; border: 2px solid var(--ink); border-radius: 50%; background: var(--sun); }
+.safe-card__head strong { font-size: 18px; letter-spacing: -.02em; }
+.safe-card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.safe-card li { display: flex; gap: 10px; font-size: 15px; font-weight: 600; line-height: 1.5; color: var(--ink); }
+.safe-card li::before { content: "✓"; flex: none; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--primary); color: #fff; font-size: 12px; font-weight: 800; }
+
+.about-card { margin-top: 28px; padding: 24px; border: 1px solid var(--line); border-radius: 20px; background: #fff; }
+.about-card h2 { margin: 0 0 10px; font-size: 22px; letter-spacing: -.02em; }
+.about-card p { margin: 0; color: #33423d; font-size: 17px; line-height: 1.75; white-space: pre-line; }
+
 @media (max-width: 560px) {
   .gal-arrow { width: 40px; height: 40px; }
 }

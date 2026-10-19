@@ -1,14 +1,17 @@
 import { Link } from 'react-router-dom';
-import Icon from './Icon';
+
 
 export default function Footer() {
   return (
     <footer>
       <div className="footer-main">
         <div>
-          <Link to="/" className="logo">
-            <span className="logo__mark"><Icon name="home" size={18} /></span>
-            <span>Abodified</span>
+          <Link to="/" className="logo" aria-label="Abodified home" style={{ gap: 0 }}>
+            <svg width="22" height="27" viewBox="0 0 44 50" aria-hidden="true" style={{ flexShrink: 0 }}>
+              <polyline points="5,46 22,6 39,46" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="17" y="30" width="10" height="16" rx="2" fill="#FFC93C" />
+            </svg>
+            <span>bodified</span>
           </Link>
           <p>Trusted student accommodation, built for Ikere Ekiti.</p>
         </div>

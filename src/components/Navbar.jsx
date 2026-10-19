@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import Icon from './Icon';
+
 
 export default function Navbar() {
   const navigate = useNavigate();

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { toWhatsApp, formatTag, periodLabel, distanceKm, formatDistance } from '../utils/helpers';
+import Icon from '../components/Icon';
 
 // Captions for photos taken through the Post a Room form (same order as the form)
 const CAPTIONS = ['Main room', 'Toilet & bathroom', 'Kitchen & water', 'Compound & outside'];
@@ -199,10 +200,10 @@ export default function ListingDetail() {
             )}
           </div>
 
-          <h2 className="mt-8 text-xl font-bold">About this room</h2>
-          <p className="mt-2 whitespace-pre-line leading-relaxed text-brand-900/80">
-            {listing.description || 'The owner has not added a description yet.'}
-          </p>
+          <div className="about-card">
+              <h2>About this room</h2>
+              <p>{listing.description || 'The owner has not added a description yet.'}</p>
+            </div>
         </div>
 
         {/* Right: summary + contact */}
@@ -238,10 +239,18 @@ export default function ListingDetail() {
             </button>
             {contactError && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{contactError}</p>}
 
-            <p className="mt-4 rounded-xl bg-brand-50 p-3 text-xs leading-relaxed text-brand-900/75">
-              <strong>Stay safe:</strong> see the room in person before you pay anything, and never send money to
-              someone you haven't met.
-            </p>
+            <div className="safe-card">
+              <div className="safe-card__head">
+                <span><Icon name="shield" size={20} /></span>
+                <strong>Stay safe before you pay</strong>
+              </div>
+              <ul>
+                <li>See the room in person before you pay anything.</li>
+                <li>Never send money to someone you haven’t met.</li>
+                <li>Ask for a signed receipt with the amount and date.</li>
+                <li>Take a friend with you when you go to see it.</li>
+              </ul>
+            </div>
           </div>
         </aside>
       </div>
