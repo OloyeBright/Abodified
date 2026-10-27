@@ -27,6 +27,11 @@ export default function Login() {
     <div className="mx-auto max-w-md px-4 py-14">
       <div className="rounded-3xl border border-brand-100 bg-white p-8 shadow-sm">
         <h1 className="text-3xl font-extrabold tracking-tight">Welcome back</h1>
+            {new URLSearchParams(window.location.search).get('confirmed') && (
+      <p className="mt-3 rounded-xl bg-brand-50 p-3 text-sm text-brand-900">
+        ✅ Your email is confirmed. Log in to continue.
+      </p>
+)}
         <p className="mt-1 text-sm text-brand-900/70">Log in to chat with owners or manage your rooms.</p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
