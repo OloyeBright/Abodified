@@ -4,7 +4,7 @@ import Icon from './Icon';
 // Stock photo from the design. Replace with your own file later,
 // e.g. put hero.jpg in the "public" folder and use src="/hero.jpg".
 const HERO_IMG =
-  'https://images.unsplash.com/photo-1657040899601-fbcc8f6486f6?auto=format&fit=crop&w=1200&q=85';
+  '/hero.jpg';
 
 // areas comes from Home (loaded from your database)
 export default function HeroSection({ areas = [] }) {
@@ -53,7 +53,7 @@ export default function HeroSection({ areas = [] }) {
         </div>
         <div className="floating-card floating-card--bottom">
           <small>Self Contain</small>
-          <strong>₦180,000 <em>/ year</em></strong>
+          <strong>₦270,000 <em>/ year</em></strong>
           <span><Icon name="pin" size={14} /> Near BOUESTI Main Gate</span>
         </div>
       </div>
