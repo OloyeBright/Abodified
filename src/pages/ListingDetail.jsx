@@ -6,6 +6,17 @@ import Icon from '../components/Icon';
 
 // Captions for photos taken through the Post a Room form (same order as the form)
 const CAPTIONS = ['Main room', 'Toilet & bathroom', 'Kitchen & water', 'Compound & outside'];
+const CAPTION_BY_KEY = {
+  room: 'Main room', bath: 'Toilet & bathroom', kitchen: 'Kitchen & water',
+  outside: 'Compound & outside', bedroom2: 'Second bedroom', parlour: 'Parlour',
+};
+
+// New photos carry their label in the file name (e.g. ...-parlour.jpg). Older ones use the order.
+function captionFor(url, index, total) {
+  const m = url && url.match(/-(room|bath|kitchen|outside|bedroom2|parlour)\.[a-z0-9]+(\?.*)?$/i);
+  if (m) return CAPTION_BY_KEY[m[1].toLowerCase()];
+  return total >= 4 ? CAPTIONS[index] || null : null;
+}
 
 // NOTE: contact_number and exact_address are deliberately NOT selected here.
 const DETAIL_COLUMNS =
@@ -178,8 +189,8 @@ export default function ListingDetail() {
                 </>
               )}
 
-              {showCaptions && CAPTIONS[active] && (
-                <span className="gal-chip gal-chip--left">{CAPTIONS[active]}</span>
+             {captionFor(photos[active], active, photos.length) && (
+                <span className="gal-chip gal-chip--left">{captionFor(photos[active], active, photos.length)}</span>
               )}
             </div>
 

@@ -21,6 +21,11 @@ const PHOTO_SLOTS = [
   { key: 'kitchen', label: 'Kitchen & water', hint: 'Kitchen, tap or tank' },
   { key: 'outside', label: 'Compound / outside', hint: 'Entrance, gate or street' },
 ];
+// Optional photos for bigger places (2-bedroom flats, rooms with a parlour)
+const OPTIONAL_SLOTS = [
+  { key: 'bedroom2', label: 'Second bedroom', hint: 'For 2-bedroom flats' },
+  { key: 'parlour', label: 'Parlour', hint: 'The sitting room, if there is one' },
+];
 const MAX_MB = 5;
 
 const inputClass =
@@ -65,7 +70,7 @@ export default function PostListing() {
     description: '',
   });
   const [utilities, setUtilities] = useState({});
-  const [slots, setSlots] = useState({ room: null, bath: null, kitchen: null, outside: null });
+  const [slots, setSlots] = useState({ room: null, bath: null, kitchen: null, outside: null, bedroom2: null, parlour: null });
   const [extras, setExtras] = useState([]);
 
   // WhatsApp self-check
@@ -123,7 +128,12 @@ export default function PostListing() {
     const missing = PHOTO_SLOTS.filter((s) => !slots[s.key]);
     if (missing.length) return setErrorMsg(`Please add all 4 photos. Missing: ${missing.map((m) => m.label).join(', ')}.`);
 
-    const allFiles = [...PHOTO_SLOTS.map((s) => slots[s.key]), ...extras];
+    const entries = [
+      ...PHOTO_SLOTS.map((s) => ({ key: s.key, file: slots[s.key] })),
+      ...OPTIONAL_SLOTS.filter((s) => slots[s.key]).map((s) => ({ key: s.key, file: slots[s.key] })),
+      ...extras.map((file, i) => ({ key: `extra${i + 1}`, file })),
+    ];
+    const allFiles = entries.map((e) => e.file);
     for (const f of allFiles) {
       if (!f.type.startsWith('image/')) return setErrorMsg(`"${f.name}" is not an image.`);
       if (f.size > MAX_MB * 1024 * 1024) return setErrorMsg(`"${f.name}" is bigger than ${MAX_MB}MB.`);
@@ -136,7 +146,7 @@ export default function PostListing() {
     for (let i = 0; i < allFiles.length; i++) {
       const file = allFiles[i];
       const ext = file.name.split('.').pop();
-      const path = `${user.id}/${Date.now()}-${i}.${ext}`;
+      const path = `${user.id}/${Date.now()}-${entries[i].key}.${ext}`;
       const { error: upErr } = await supabase.storage.from('listing-photos').upload(path, file);
       if (upErr) {
         setSubmitting(false);
@@ -316,14 +326,35 @@ export default function PostListing() {
 
         {/* Photos */}
         <div>
-          <p className="text-sm font-semibold">Photos <span className="font-normal text-brand-900/50">(all 4 required, max 5MB each)</span></p>
+          <p className="text-sm font-semibold">Photos <span className="font-normal text-brand-900/50">(first 4 required, max 5MB each)</span></p>
           <div className="mt-2 grid grid-cols-2 gap-3">
             {PHOTO_SLOTS.map((s) => (
               <PhotoSlot key={s.key} label={s.label} hint={s.hint} file={slots[s.key]}
                          onChange={(f) => setSlots((p) => ({ ...p, [s.key]: f }))} />
             ))}
           </div>
-          <div className="mt-3">
+          <div className="mt-5">
+            <p className="text-sm font-semibold">
+              Bigger place? <span className="font-normal text-brand-900/50">(optional)</span>
+            </p>
+            <p className="text-xs text-brand-900/60">Add these if you are posting a 2-bedroom flat or the place has a parlour.</p>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              {OPTIONAL_SLOTS.map((s) => (
+                <div key={s.key}>
+                  <PhotoSlot label={s.label} hint={s.hint} file={slots[s.key]}
+                             onChange={(f) => setSlots((p) => ({ ...p, [s.key]: f }))} />
+                  {slots[s.key] && (
+                    <button type="button" onClick={() => setSlots((p) => ({ ...p, [s.key]: null }))}
+                            className="mt-1 text-xs font-semibold text-red-600">
+                      Remove photo
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-5">
             <label className="text-sm font-medium text-brand-900/70">More photos (optional, up to 4)</label>
             <input type="file" accept="image/*" multiple
                    onChange={(e) => setExtras(Array.from(e.target.files).slice(0, 4))}
