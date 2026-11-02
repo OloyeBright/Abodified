@@ -690,6 +690,11 @@ a.logo, a.btn { text-decoration: none; }
 .about-card h2 { margin: 0 0 10px; font-size: 22px; letter-spacing: -.02em; }
 .about-card p { margin: 0; color: #33423d; font-size: 17px; line-height: 1.75; white-space: pre-line; }
 
+/* ===== Notification bell ===== */
+.bell { position: relative; display: grid; place-items: center; width: 40px; height: 40px; border: 2px solid var(--ink); border-radius: 50%; background: #fff; color: var(--ink); text-decoration: none; }
+.bell:hover { background: var(--sun); }
+.bell__dot { position: absolute; top: -5px; right: -5px; min-width: 19px; height: 19px; padding: 0 5px; display: grid; place-items: center; border: 2px solid #fff; border-radius: 999px; background: #e5484d; color: #fff; font-size: 11px; font-weight: 800; }
+
 @media (max-width: 560px) {
   .gal-arrow { width: 40px; height: 40px; }
 }

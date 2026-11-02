@@ -12,7 +12,16 @@ const BADGE = {
   EXPIRED: 'bg-gray-200 text-gray-700',
 };
 
-// An ACTIVE listing whose date has passed is shown as EXPIRED
+// Quick reasons the admin can tap. The poster sees these in their notifications.
+const REASONS = [
+  'Photos are blurry or too dark',
+  'Photos do not show the room clearly',
+  'Exact address is incomplete',
+  'WhatsApp number could not be reached',
+  'Price does not look right',
+  'This looks like a duplicate post',
+];
+
 function shownStatus(item) {
   if (item.status === 'ACTIVE' && item.expires_at && new Date(item.expires_at) < new Date()) return 'EXPIRED';
   return item.status;
@@ -36,14 +45,19 @@ function utilityTags(u) {
 }
 
 export default function Admin() {
-  const [access, setAccess] = useState('checking'); // checking | denied | admin
+  const [access, setAccess] = useState('checking');
   const [all, setAll] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
-  const [tab, setTab] = useState('pending');         // pending | all
+  const [tab, setTab] = useState('pending');
   const [filter, setFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
+
+  // The rejection form: which listing is being rejected, and the reason typed
+  const [rejecting, setRejecting] = useState(null);
+  const [reasonPick, setReasonPick] = useState('');
+  const [reasonNote, setReasonNote] = useState('');
 
   useEffect(() => {
     async function init() {
@@ -68,25 +82,56 @@ export default function Admin() {
     setLoading(false);
   }
 
-  // Approve, re-publish or reject
-  async function setStatus(item, newStatus) {
-    if (newStatus === 'REJECTED' && !window.confirm(`Reject "${item.title}"? It will disappear from the site.`)) return;
+  function startReject(item) {
+    setRejecting(item);
+    setReasonPick('');
+    setReasonNote('');
+  }
 
+  function finalReason() {
+    return [reasonPick, reasonNote.trim()].filter(Boolean).join(' — ');
+  }
+
+  // Approve, re-publish, or reject (reject always needs a reason)
+  async function setStatus(item, newStatus, reason) {
     setBusyId(item.id);
     const changes = { status: newStatus };
-    // Approved listings stay live for 14 days FROM APPROVAL
-    if (newStatus === 'ACTIVE') changes.expires_at = new Date(Date.now() + 14 * DAY).toISOString();
+    if (newStatus === 'ACTIVE') {
+      changes.expires_at = new Date(Date.now() + 14 * DAY).toISOString();
+      changes.rejection_reason = null;
+    }
+    if (newStatus === 'REJECTED') changes.rejection_reason = reason;
 
     const { data, error } = await supabase.from('listings').update(changes).eq('id', item.id).select('id');
     setBusyId(null);
 
     if (error) return setNotice('Error: ' + error.message);
     if (!data || data.length === 0) return setNotice('Nothing changed. The database blocked the update.');
-    setNotice(newStatus === 'ACTIVE' ? `✅ "${item.title}" is live for 14 days.` : `"${item.title}" was rejected and is now hidden.`);
+    setNotice(newStatus === 'ACTIVE'
+      ? `✅ "${item.title}" is live for 14 days. The poster has been notified.`
+      : `"${item.title}" was rejected. The poster has been notified with the reason.`);
     fetchAll();
   }
 
-  // Delete for good (listing row + its photo files)
+  async function confirmReject() {
+    const reason = finalReason();
+    if (reason.length < 5) {
+      return setNotice('Pick a reason or write one, so the poster knows what to fix.');
+    }
+    const item = rejecting;
+    setRejecting(null);
+    await setStatus(item, 'REJECTED', reason);
+  }
+
+  // Optional: also message the poster on WhatsApp with the reason filled in
+  function whatsappReason(item) {
+    const reason = finalReason() || 'please check your room details.';
+    const msg = encodeURIComponent(
+      `Hello, this is Abodified about your room "${item.title}". It was not approved yet because: ${reason} Please update it and post again. Thank you.`
+    );
+    window.open(`https://wa.me/${toWhatsApp(item.contact_number)}?text=${msg}`, '_blank', 'noopener');
+  }
+
   async function handleDelete(item) {
     if (!window.confirm(`Delete "${item.title}" permanently?\n\nThis cannot be undone.`)) return;
 
@@ -99,7 +144,6 @@ export default function Admin() {
       return setNotice('Nothing was deleted. The database blocked it. Run the "Admins can delete listings" SQL first.');
     }
 
-    // Best effort: remove the photo files too (ignored if it fails)
     try {
       const paths = [...new Set([item.photo_url, ...(item.photos || [])].map(photoPath).filter(Boolean))];
       if (paths.length) await supabase.storage.from('listing-photos').remove(paths);
@@ -109,7 +153,48 @@ export default function Admin() {
     fetchAll();
   }
 
-  const pending = useMemo(() => all.filter((l) => l.status === 'PENDING').reverse(), [all]); // oldest first
+  // The reason panel that opens under a listing when rejecting it
+  function renderRejectPanel(item) {
+    if (rejecting?.id !== item.id) return null;
+    return (
+      <div className="mt-5 rounded-2xl border border-red-200 bg-red-50/40 p-4">
+        <p className="text-sm font-bold text-red-700">Why is this being rejected?</p>
+        <p className="text-xs text-brand-900/60">The poster will see this reason in their notifications.</p>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {REASONS.map((r) => (
+            <button key={r} type="button" onClick={() => setReasonPick(reasonPick === r ? '' : r)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                reasonPick === r ? 'border-red-600 bg-red-600 text-white' : 'border-red-200 bg-white text-brand-900/80'
+              }`}>
+              {r}
+            </button>
+          ))}
+        </div>
+
+        <textarea rows={2} value={reasonNote} onChange={(e) => setReasonNote(e.target.value)}
+          placeholder="Add more detail (optional), e.g. the third photo is too dark"
+          className="mt-3 w-full rounded-xl border border-brand-100 bg-white px-3 py-2 text-sm outline-none focus:border-brand-600" />
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={confirmReject} disabled={busyId === item.id}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">
+            Send rejection
+          </button>
+          <button type="button" onClick={() => whatsappReason(item)}
+            className="rounded-lg border border-brand-600 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50">
+            Also message poster on WhatsApp
+          </button>
+          <button type="button" onClick={() => setRejecting(null)}
+            className="px-3 py-2 text-sm font-semibold text-brand-900/60 hover:text-brand-900">
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const pending = useMemo(() => all.filter((l) => l.status === 'PENDING').reverse(), [all]);
 
   const counts = useMemo(() => {
     const c = { ALL: all.length, ACTIVE: 0, PENDING: 0, REJECTED: 0, EXPIRED: 0 };
@@ -144,7 +229,7 @@ export default function Admin() {
     <div className="mx-auto max-w-5xl px-4 py-10">
       <p className="text-sm font-semibold text-brand-600">Admin</p>
       <h1 className="mt-1 text-3xl font-extrabold tracking-tight">Manage listings</h1>
-      <p className="mt-1 text-brand-900/70">Approve new posts, hide bad ones, or delete test and fake listings.</p>
+      <p className="mt-1 text-brand-900/70">Approve new posts, reject them with a reason, or delete test and fake listings.</p>
 
       {notice && (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-brand-50 p-3 text-sm text-brand-900">
@@ -153,7 +238,6 @@ export default function Admin() {
         </div>
       )}
 
-      {/* Tabs */}
       <div className="mt-6 flex gap-2 border-b border-brand-100">
         {[['pending', `Pending (${pending.length})`], ['all', `All listings (${all.length})`]].map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
@@ -168,7 +252,6 @@ export default function Admin() {
       {loading ? (
         <p className="py-16 text-center text-brand-900/60">Loading…</p>
       ) : tab === 'pending' ? (
-        /* ---------------- PENDING TAB ---------------- */
         <div className="mt-6 space-y-6">
           {pending.length === 0 && (
             <p className="rounded-3xl border border-brand-100 bg-white p-12 text-center text-brand-900/60">🎉 Nothing waiting for review.</p>
@@ -206,17 +289,20 @@ export default function Admin() {
                 </dl>
                 {item.description && <p className="mt-3 text-sm text-brand-900/80">{item.description}</p>}
 
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <button disabled={busyId === item.id} onClick={() => setStatus(item, 'ACTIVE')} className={`${btn} bg-brand-700 text-white hover:bg-brand-600`}>Approve &amp; Publish</button>
-                  <button disabled={busyId === item.id} onClick={() => setStatus(item, 'REJECTED')} className={`${btn} border border-red-200 text-red-600 hover:bg-red-50`}>Reject</button>
-                  <button disabled={busyId === item.id} onClick={() => handleDelete(item)} className={`${btn} text-brand-900/60 hover:text-red-600`}>Delete</button>
-                </div>
+                {renderRejectPanel(item)}
+
+                {rejecting?.id !== item.id && (
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button disabled={busyId === item.id} onClick={() => setStatus(item, 'ACTIVE')} className={`${btn} bg-brand-700 text-white hover:bg-brand-600`}>Approve &amp; Publish</button>
+                    <button disabled={busyId === item.id} onClick={() => startReject(item)} className={`${btn} border border-red-200 text-red-600 hover:bg-red-50`}>Reject…</button>
+                    <button disabled={busyId === item.id} onClick={() => handleDelete(item)} className={`${btn} text-brand-900/60 hover:text-red-600`}>Delete</button>
+                  </div>
+                )}
               </article>
             );
           })}
         </div>
       ) : (
-        /* ---------------- ALL LISTINGS TAB ---------------- */
         <div className="mt-6">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by title or area…"
                  className="w-full rounded-xl border border-brand-100 bg-white px-4 py-3 text-sm outline-none focus:border-brand-600" />
@@ -241,36 +327,44 @@ export default function Admin() {
               const cover = item.photos?.[0] || item.photo_url;
               const live = st === 'ACTIVE';
               return (
-                <article key={item.id} className="flex flex-col gap-4 rounded-2xl border border-brand-100 bg-white p-4 sm:flex-row sm:items-center">
-                  <div className="h-24 w-full shrink-0 overflow-hidden rounded-xl bg-brand-50 sm:h-20 sm:w-28">
-                    {cover && <img src={cover} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="truncate text-base font-bold capitalize">{item.title}</h3>
-                      <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${BADGE[st] || BADGE.EXPIRED}`}>{st}</span>
+                <article key={item.id} className="rounded-2xl border border-brand-100 bg-white p-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                    <div className="h-24 w-full shrink-0 overflow-hidden rounded-xl bg-brand-50 sm:h-20 sm:w-28">
+                      {cover && <img src={cover} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
                     </div>
-                    <p className="mt-0.5 text-sm text-brand-900/60">
-                      #{item.id} • {item.areas?.name} • ₦{Number(item.rent_amount).toLocaleString()} / {periodLabel[item.rent_period] || item.rent_period}
-                    </p>
-                    <p className="text-xs text-brand-900/50">
-                      Posted {fmtDate(item.created_at)}{item.status === 'ACTIVE' && ` • ${st === 'EXPIRED' ? 'Expired' : 'Expires'} ${fmtDate(item.expires_at)}`}
-                    </p>
-                  </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {live && <Link to={`/listing/${item.id}`} className={`${btn} border border-brand-100 text-brand-700 hover:bg-brand-50`}>View</Link>}
-                    {st !== 'ACTIVE' && (
-                      <button disabled={busyId === item.id} onClick={() => setStatus(item, 'ACTIVE')} className={`${btn} bg-brand-700 text-white hover:bg-brand-600`}>
-                        {st === 'PENDING' ? 'Approve' : 'Re-publish'}
-                      </button>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate text-base font-bold capitalize">{item.title}</h3>
+                        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${BADGE[st] || BADGE.EXPIRED}`}>{st}</span>
+                      </div>
+                      <p className="mt-0.5 text-sm text-brand-900/60">
+                        #{item.id} • {item.areas?.name} • ₦{Number(item.rent_amount).toLocaleString()} / {periodLabel[item.rent_period] || item.rent_period}
+                      </p>
+                      <p className="text-xs text-brand-900/50">
+                        Posted {fmtDate(item.created_at)}{item.status === 'ACTIVE' && ` • ${st === 'EXPIRED' ? 'Expired' : 'Expires'} ${fmtDate(item.expires_at)}`}
+                      </p>
+                      {st === 'REJECTED' && item.rejection_reason && (
+                        <p className="mt-1 text-xs text-red-700">Reason sent: {item.rejection_reason}</p>
+                      )}
+                    </div>
+
+                    {rejecting?.id !== item.id && (
+                      <div className="flex flex-wrap gap-2">
+                        {live && <Link to={`/listing/${item.id}`} className={`${btn} border border-brand-100 text-brand-700 hover:bg-brand-50`}>View</Link>}
+                        {st !== 'ACTIVE' && (
+                          <button disabled={busyId === item.id} onClick={() => setStatus(item, 'ACTIVE')} className={`${btn} bg-brand-700 text-white hover:bg-brand-600`}>
+                            {st === 'PENDING' ? 'Approve' : 'Re-publish'}
+                          </button>
+                        )}
+                        {st !== 'REJECTED' && (
+                          <button disabled={busyId === item.id} onClick={() => startReject(item)} className={`${btn} border border-amber-200 text-amber-700 hover:bg-amber-50`}>Hide…</button>
+                        )}
+                        <button disabled={busyId === item.id} onClick={() => handleDelete(item)} className={`${btn} border border-red-200 text-red-600 hover:bg-red-50`}>Delete</button>
+                      </div>
                     )}
-                    {st !== 'REJECTED' && (
-                      <button disabled={busyId === item.id} onClick={() => setStatus(item, 'REJECTED')} className={`${btn} border border-amber-200 text-amber-700 hover:bg-amber-50`}>Hide</button>
-                    )}
-                    <button disabled={busyId === item.id} onClick={() => handleDelete(item)} className={`${btn} border border-red-200 text-red-600 hover:bg-red-50`}>Delete</button>
                   </div>
+                  {renderRejectPanel(item)}
                 </article>
               );
             })}
