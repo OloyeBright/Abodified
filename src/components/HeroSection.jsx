@@ -4,7 +4,7 @@ import Icon from './Icon';
 // Stock photo from the design. Replace with your own file later,
 // e.g. put hero.jpg in the "public" folder and use src="/hero.jpg".
 const HERO_IMG =
-  '/hero.jpg';
+  '/hero4.jpg';
 
 // areas comes from Home (loaded from your database)
 export default function HeroSection({ areas = [] }) {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { normalizeNgNumber } from '../utils/helpers';
+import { normalizeNgNumber, compressImage } from '../utils/helpers';
 
 const ROOM_TYPES = ['Single Room', 'Self Contain', 'Mini Flat', 'Room & Parlour'];
 
@@ -26,7 +26,8 @@ const OPTIONAL_SLOTS = [
   { key: 'bedroom2', label: 'Second bedroom', hint: 'For 2-bedroom flats' },
   { key: 'parlour', label: 'Parlour', hint: 'The sitting room, if there is one' },
 ];
-const MAX_MB = 5;
+const MAX_MB = 25;          // the photo you pick can be big, we shrink it before uploading
+const MAX_UPLOAD_MB = 5;    // the shrunk file must fit under this
 
 const inputClass =
   'mt-1 w-full rounded-xl border border-brand-100 bg-white px-4 py-3 outline-none focus:border-brand-600';
@@ -144,7 +145,12 @@ export default function PostListing() {
     // ---- 2. Upload every photo, collect the public links ----
     const urls = [];
     for (let i = 0; i < allFiles.length; i++) {
-      const file = allFiles[i];
+      // Shrink first: keeps good quality but makes pages load fast on phone data
+      const file = await compressImage(allFiles[i]);
+      if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+        setSubmitting(false);
+        return setErrorMsg(`"${allFiles[i].name}" is still too large. Please pick a smaller photo.`);
+      }
       const ext = file.name.split('.').pop();
       const path = `${user.id}/${Date.now()}-${entries[i].key}.${ext}`;
       const { error: upErr } = await supabase.storage.from('listing-photos').upload(path, file);
@@ -326,7 +332,7 @@ export default function PostListing() {
 
         {/* Photos */}
         <div>
-          <p className="text-sm font-semibold">Photos <span className="font-normal text-brand-900/50">(first 4 required, max 5MB each)</span></p>
+          <p className="text-sm font-semibold">Photos <span className="font-normal text-brand-900/50">(first 4 required, big photos are fine, we shrink them for you)</span></p>
           <div className="mt-2 grid grid-cols-2 gap-3">
             {PHOTO_SLOTS.map((s) => (
               <PhotoSlot key={s.key} label={s.label} hint={s.hint} file={slots[s.key]}
