@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { toWhatsApp, formatTag, periodLabel, distanceKm, formatDistance } from '../utils/helpers';
 import Icon from '../components/Icon';
+ import ReportListing from '../components/ReportListing';
 
 // Captions for photos taken through the Post a Room form (same order as the form)
 const CAPTIONS = ['Main room', 'Toilet & bathroom', 'Kitchen & water', 'Compound & outside'];
@@ -262,6 +263,7 @@ export default function ListingDetail() {
                 <li>Take a friend with you when you go to see it.</li>
               </ul>
             </div>
+            <ReportListing listingId={listing.id} user={user} />
           </div>
         </aside>
       </div>

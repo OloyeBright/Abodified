@@ -12,6 +12,8 @@ import SignUp from './pages/SignUp';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Notifications from './pages/Notifications';
+import AdminReports from './pages/AdminReports';
+
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -33,6 +35,7 @@ function AppRoutes() {
         <Route path="/post-listing" element={<PostListing />} />
         <Route path="/post" element={<Navigate to="/post-listing" replace />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/reports" element={<AdminReports />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
