@@ -13,7 +13,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Notifications from './pages/Notifications';
 import AdminReports from './pages/AdminReports';
-
+import MyListings from './pages/MyListings';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -42,6 +42,7 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" replace />} />
         <Route path="/notifications" element={<Notifications />} />
+        <Route path="/my-listings" element={<MyListings />} />
       </Routes>
     </ErrorBoundary>
   );

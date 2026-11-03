@@ -28,7 +28,6 @@ export default function Navbar() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  // On every page change: close the mobile menu and refresh the unread count
   useEffect(() => {
     setOpen(false);
     if (user) countUnread();
@@ -69,6 +68,7 @@ export default function Navbar() {
         <nav className={`nav ${open ? 'nav--open' : ''}`} aria-label="Main navigation">
           <Link to="/browse">Browse</Link>
           {role === 'admin' && <Link to="/admin">Admin Dashboard</Link>}
+          {user && <Link to="/my-listings">My rooms</Link>}
 
           <Link to="/post-listing" className="btn btn--secondary">
             Post a Room <Icon name="plus" size={18} />
@@ -76,11 +76,8 @@ export default function Navbar() {
 
           {user ? (
             <>
-              <Link
-                to="/notifications"
-                className="bell"
-                aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
-              >
+              <Link to="/notifications" className="bell"
+                    aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8" />

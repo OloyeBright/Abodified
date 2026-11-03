@@ -70,17 +70,23 @@ export default function Admin() {
     }
     init();
   }, []);
-
+  
   async function fetchAll() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('listings')
-      .select('*, areas(name)')
-      .order('created_at', { ascending: false });
-    if (error) setNotice('Could not load listings: ' + error.message);
-    else setAll(data || []);
+    const [listRes, areaRes] = await Promise.all([
+      supabase.rpc('admin_list_listings'),
+      supabase.from('areas').select('id, name'),
+    ]);
+    if (listRes.error) {
+      setNotice('Could not load listings: ' + listRes.error.message);
+      setLoading(false);
+      return;
+    }
+    const names = Object.fromEntries((areaRes.data || []).map((a) => [a.id, a.name]));
+    setAll((listRes.data || []).map((l) => ({ ...l, areas: { name: names[l.area_id] } })));
     setLoading(false);
   }
+
 
   function startReject(item) {
     setRejecting(item);

@@ -3,13 +3,9 @@ import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
 const REPORT_REASONS = [
-  'Room is not available',
-  'Photos are not of this room',
-  'Price is wrong',
-  'Address is fake or wrong',
-  'WhatsApp number does not work',
-  'Scam or asking for money',
-  'Other',
+  'Unavailable: the room is taken or no longer offered',
+  'Inaccurate: the photos, price, address or number are wrong',
+  'Fraudulent: asking for money, or the room does not exist',
 ];
 
 export default function ReportListing({ listingId, user }) {
