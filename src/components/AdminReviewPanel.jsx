@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { toWhatsApp } from '../utils/helpers';
+import { useConfirm } from './ConfirmDialog';
 
 const CHECKS = [
   { key: 'check_proof', label: 'Proof checked (ownership document or letter of authority, or a video call with the owner)' },
@@ -11,10 +12,6 @@ const CHECKS = [
 
 const MIN_REASON = 20;
 
-// The admin review panel for each pending listing.
-// - Approve: needs every checklist item ticked and proof attached.
-// - Attach proof: the admin uploads a document the poster sent on WhatsApp.
-// - Approve without proof: an override that needs a written reason, saved with the listing.
 export default function AdminReviewPanel({ item, onChanged, onReject, onDelete }) {
   const [poster, setPoster] = useState(null);
   const [proofUrl, setProofUrl] = useState(null);
@@ -22,6 +19,7 @@ export default function AdminReviewPanel({ item, onChanged, onReject, onDelete }
   const [overrideText, setOverrideText] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [ask, dialog] = useConfirm();
 
   useEffect(() => {
     setChecks({
@@ -67,7 +65,7 @@ export default function AdminReviewPanel({ item, onChanged, onReject, onDelete }
     setMsg('');
   }
 
-    // Reads the checklist from the DATABASE through an admin-only function
+  // Reads the checklist from the database through the admin-only function
   async function missingChecks() {
     const { data, error } = await supabase.rpc('admin_checklist', { p_listing_id: item.id });
     const row = Array.isArray(data) ? data[0] : data;
@@ -101,8 +99,10 @@ export default function AdminReviewPanel({ item, onChanged, onReject, onDelete }
     onChanged();
   }
 
-  async function approve(extra = {}, confirmText) {
-    if (!window.confirm(confirmText)) return;
+  // Shared approve step: asks with the styled dialog, checks the database, then publishes
+  async function approve(extra = {}, question) {
+    const ok = await ask(question);
+    if (!ok) return;
     const missing = await missingChecks();
     if (missing.length) {
       return setMsg('Still not saved in the database: ' + missing.join(', ') + '. Untick and tick them again.');
@@ -126,27 +126,39 @@ export default function AdminReviewPanel({ item, onChanged, onReject, onDelete }
 
   function approveWithProof() {
     if (!canApprove) return setMsg('Complete the checklist and make sure proof is attached first.');
-    approve({}, `Approve "${item.title}" and publish it for 14 days?`);
+    approve({}, {
+      title: 'Approve and publish?',
+      message: `"${item.title}" will go live for 14 days.`,
+      confirmText: 'Approve & publish',
+    });
   }
 
   function approveWithoutProof() {
     if (!canOverride) return setMsg(`Tick every checklist item and write at least ${MIN_REASON} characters of reason.`);
     approve(
+      { approved_without_proof: true, override_reason: overrideText.trim(), override_at: new Date().toISOString() },
       {
-        approved_without_proof: true,
-        override_reason: overrideText.trim(),
-        override_at: new Date().toISOString(),
-      },
-      `Approve "${item.title}" WITHOUT a document? Your reason will be saved with the listing.`
+        title: 'Approve without a document?',
+        message: 'Your written reason will be saved with this listing and counted in reports.',
+        confirmText: 'Approve without document',
+        danger: true,
+      }
     );
   }
 
   async function toggleSuspend() {
     const next = !poster?.is_suspended;
-    const text = next
-      ? `Suspend ${poster?.poster_email || 'this poster'}? Their pending and live rooms will be rejected, and they cannot post again.`
-      : `Lift the suspension for ${poster?.poster_email || 'this poster'}?`;
-    if (!window.confirm(text)) return;
+    const ok = await ask(next ? {
+      title: 'Suspend this poster?',
+      message: `${poster?.poster_email || 'This poster'} cannot post again. Their pending and live rooms will be rejected.`,
+      confirmText: 'Suspend poster',
+      danger: true,
+    } : {
+      title: 'Lift the suspension?',
+      message: `${poster?.poster_email || 'This poster'} will be able to post again.`,
+      confirmText: 'Lift suspension',
+    });
+    if (!ok) return;
     setBusy(true);
     const { error } = await supabase.rpc('admin_set_suspended', { p_user: item.owner_id, p_suspend: next });
     setBusy(false);
@@ -157,6 +169,8 @@ export default function AdminReviewPanel({ item, onChanged, onReject, onDelete }
 
   return (
     <div className="mt-5 space-y-4 rounded-2xl border border-brand-100 bg-brand-50/40 p-4">
+      {dialog}
+
       <p className="text-sm">
         <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-800">{item.poster_type}</span>{' '}
         Posted by <strong>{poster?.poster_name || 'no name'}</strong> ({poster?.poster_email || 'no email'})

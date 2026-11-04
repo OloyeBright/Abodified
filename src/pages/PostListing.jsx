@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { useConfirm } from '../components/ConfirmDialog';
 import { normalizeNgNumber, compressImage } from '../utils/helpers';
 
 const ROOM_TYPES = ['Single Room', 'Self Contain', 'Mini Flat', 'Room & Parlour'];
@@ -70,6 +71,7 @@ export default function PostListing() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
   const [areas, setAreas] = useState([]);
+  const [ask, dialog] = useConfirm();
 
   const [form, setForm] = useState({
     title: '',
@@ -134,6 +136,10 @@ export default function PostListing() {
     if (!form.accommodation_type) return setErrorMsg('Please choose a room type.');
     if (!form.area_id) return setErrorMsg('Please choose an area.');
     if (proofFile && proofFile.size > 8 * 1024 * 1024) return setErrorMsg('The proof file must be under 8MB.');
+    if (!proofFile && form.poster_type !== 'STUDENT') {
+      const ok = await ask({ title: 'Submit without proof?', message: 'The room will be saved, but it cannot go live until proof is checked.', confirmText: 'Submit anyway', cancelText: 'Go back and add proof' });
+      if (!ok) return;
+    }
     if (!form.rent_amount || Number(form.rent_amount) <= 0) return setErrorMsg('Please enter the rent amount.');
     if (!form.exact_address.trim()) return setErrorMsg('Please enter the exact address (only admins see this).');
     if (!cleanNumber) return setErrorMsg('Enter a valid Nigerian WhatsApp number using digits only, e.g. 08012345678.');
@@ -254,6 +260,7 @@ export default function PostListing() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
+      {dialog}
       <p className="text-sm font-semibold text-brand-600">Post a room</p>
       <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">Tell students about your room.</h1>
       <p className="mt-2 text-brand-900/70">Every listing is reviewed before it goes live.</p>
@@ -278,20 +285,24 @@ export default function PostListing() {
             ))}
           </div>
         </div>
+        <div className="rounded-2xl border-2 border-brand-600 bg-brand-50 p-5 shadow-sm">
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-700 text-sm font-bold text-white">2</span>
+            <p className="text-lg font-bold">
+              {form.poster_type === 'AGENT' ? 'Add the owner’s permission letter'
+                : form.poster_type === 'STUDENT' ? 'Add proof (optional)'
+                : 'Add proof that this house is yours'}
+            </p>
+          </div>
 
-                <div>
-          <label className="text-base font-semibold">
-            {form.poster_type === 'AGENT' ? 'Letter of authority' : form.poster_type === 'STUDENT' ? 'Proof (optional)' : 'Proof of ownership'}{' '}
-            <span className="font-normal text-brand-900/50">(private, only admins see it)</span>
-          </label>
-          <p className="mt-1 text-base text-brand-900/80">
+          <p className="mt-2 text-base text-brand-900/80">
             {form.poster_type === 'AGENT'
               ? 'A signed letter from the owner allowing you to advertise this room.'
-              : 'A rent receipt, a tenancy agreement, or an electricity or water bill with the owner’s name on it. Photo or PDF, under 8MB.'}
+              : 'A rent receipt, a tenancy agreement, or an electricity or water bill with the owner’s name on it. Photo or PDF, under 8MB. Only admins see this.'}
           </p>
 
           {proofFile ? (
-            <div className="mt-2 flex flex-wrap items-center gap-3">
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-white p-3">
               <span className="text-base font-semibold text-brand-700">✓ {proofFile.name}</span>
               <button type="button" onClick={() => setProofFile(null)}
                       className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">
@@ -299,11 +310,19 @@ export default function PostListing() {
               </button>
             </div>
           ) : (
-            <input type="file" accept="image/*,application/pdf" onChange={(e) => setProofFile(e.target.files[0] || null)}
-                   className="mt-2 block w-full text-base file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:font-semibold file:text-brand-700" />
+            <label className="mt-4 flex cursor-pointer items-center justify-center rounded-2xl bg-brand-700 px-5 py-4 text-center text-lg font-bold text-white hover:bg-brand-600">
+              Tap here to choose the file
+              <input type="file" accept="image/*,application/pdf" className="hidden"
+                     onChange={(e) => setProofFile(e.target.files[0] || null)} />
+            </label>
+          )}
+
+          {!proofFile && form.poster_type !== 'STUDENT' && (
+            <p className="mt-3 rounded-xl bg-amber-100 p-3 text-base font-semibold text-amber-900">
+              ⚠ Your room cannot go live without this. You can still post now, and we will message you on WhatsApp.
+            </p>
           )}
         </div>
-
         <div>
           <label className="text-sm font-semibold">Listing title</label>
           <input value={form.title} onChange={(e) => update('title', e.target.value)}
