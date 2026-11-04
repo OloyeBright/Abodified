@@ -157,7 +157,12 @@ export default function ListingDetail() {
               }}
             >
               {photos.length > 0 ? (
-                <img src={photos[active]} alt={listing.title} className="h-full w-full object-cover" />
+                <>
+                  <img src={photos[active]} alt="" aria-hidden="true"
+                      className="absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-xl" />
+                  <img src={photos[active]} alt={listing.title}
+                      className="relative h-full w-full object-contain" />
+                </>
               ) : (
                 <div className="flex h-full items-center justify-center text-brand-900/50">No photos yet</div>
               )}

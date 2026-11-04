@@ -35,20 +35,32 @@ const inputClass =
 // One photo box. Shows a preview once a file is chosen.
 function PhotoSlot({ label, hint, file, onChange }) {
   const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+
+  if (preview) {
+    return (
+      <div className="relative h-40 overflow-hidden rounded-2xl border-2 border-brand-600">
+        <img src={preview} alt={label} className="absolute inset-0 h-full w-full object-cover" />
+        <span className="absolute bottom-2 left-2 rounded-md bg-white/95 px-2 py-1 text-sm font-semibold">{label}</span>
+        <div className="absolute right-2 top-2 flex gap-2">
+          <label className="cursor-pointer rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-brand-700 shadow hover:bg-brand-50">
+            Change
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => onChange(e.target.files[0] || null)} />
+          </label>
+          <button type="button" onClick={() => onChange(null)}
+                  className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-red-700">
+            Remove
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <label className="relative flex h-36 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-brand-100 bg-brand-50/50 text-center hover:border-brand-600">
-      {preview ? (
-        <>
-          <img src={preview} alt={label} className="absolute inset-0 h-full w-full object-cover" />
-          <span className="absolute bottom-2 left-2 rounded-md bg-white/90 px-2 py-0.5 text-xs font-semibold">{label}</span>
-        </>
-      ) : (
-        <>
-          <span className="text-2xl text-brand-600">+</span>
-          <span className="mt-1 text-sm font-semibold">{label}</span>
-          <span className="px-2 text-xs text-brand-900/60">{hint}</span>
-        </>
-      )}
+    <label className="flex h-40 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-brand-600 bg-brand-50/50 px-3 text-center hover:bg-brand-50">
+      <span className="text-3xl text-brand-600">+</span>
+      <span className="mt-1 text-base font-bold">{label}</span>
+      <span className="mt-1 text-sm text-brand-900/70">{hint}</span>
+      <span className="mt-2 rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white">Tap to choose a photo</span>
       <input type="file" accept="image/*" className="hidden" onChange={(e) => onChange(e.target.files[0] || null)} />
     </label>
   );
@@ -69,10 +81,12 @@ export default function PostListing() {
     exact_address: '',
     contact_number: '',
     description: '',
+    poster_type: 'LANDLORD',
   });
   const [utilities, setUtilities] = useState({});
   const [slots, setSlots] = useState({ room: null, bath: null, kitchen: null, outside: null, bedroom2: null, parlour: null });
   const [extras, setExtras] = useState([]);
+  const [proofFile, setProofFile] = useState(null);
 
   // WhatsApp self-check
   const [waTested, setWaTested] = useState(false);
@@ -119,6 +133,7 @@ export default function PostListing() {
     if (!form.title.trim()) return setErrorMsg('Please enter a listing title.');
     if (!form.accommodation_type) return setErrorMsg('Please choose a room type.');
     if (!form.area_id) return setErrorMsg('Please choose an area.');
+    if (proofFile && proofFile.size > 8 * 1024 * 1024) return setErrorMsg('The proof file must be under 8MB.');
     if (!form.rent_amount || Number(form.rent_amount) <= 0) return setErrorMsg('Please enter the rent amount.');
     if (!form.exact_address.trim()) return setErrorMsg('Please enter the exact address (only admins see this).');
     if (!cleanNumber) return setErrorMsg('Enter a valid Nigerian WhatsApp number using digits only, e.g. 08012345678.');
@@ -161,6 +176,18 @@ export default function PostListing() {
       urls.push(supabase.storage.from('listing-photos').getPublicUrl(path).data.publicUrl);
     }
 
+    // ---- 2b. Upload the private proof document (admins only) ----
+    let proofPath = null;
+    if (proofFile) {
+      const pext = proofFile.name.split('.').pop();
+      proofPath = `${user.id}/${Date.now()}-proof.${pext}`;
+      const { error: pErr } = await supabase.storage.from('listing-proof').upload(proofPath, proofFile);
+      if (pErr) {
+        setSubmitting(false);
+        return setErrorMsg('Proof upload failed: ' + pErr.message);
+      }
+    }
+
     // ---- 3. Save the listing as PENDING ----
     const { error: insertError } = await supabase.from('listings').insert({
       owner_id: user.id,
@@ -176,6 +203,8 @@ export default function PostListing() {
       description: form.description.trim(),
       photo_url: urls[0],                   // cover photo (column already exists)
       photos: urls,                         // all photos (new column)
+      poster_type: form.poster_type,
+      proof_path: proofPath,
       status: 'PENDING',
     });
 
@@ -230,6 +259,51 @@ export default function PostListing() {
       <p className="mt-2 text-brand-900/70">Every listing is reviewed before it goes live.</p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-6 rounded-3xl border border-brand-100 bg-white p-6 shadow-sm sm:p-8">
+        <div>
+          <p className="text-lg font-bold">Which one describes you?</p>
+          <div className="mt-3 grid gap-3">
+            {[
+              { v: 'LANDLORD', t: 'I own this room', d: 'I am the landlord, or the owner of the house.' },
+              { v: 'AGENT', t: 'I am an agent', d: 'The owner gave me this room to advertise for them.' },
+              { v: 'STUDENT', t: 'I am a student', d: 'I rent this room and I want to sublet it to another student.' },
+            ].map((o) => (
+              <button key={o.v} type="button"
+                      onClick={() => { update('poster_type', o.v); setProofFile(null); }}
+                      className={`rounded-2xl border-2 p-4 text-left transition ${
+                        form.poster_type === o.v ? 'border-brand-600 bg-brand-50' : 'border-brand-100 bg-white hover:border-brand-600'
+                      }`}>
+                <span className="block text-lg font-bold">{form.poster_type === o.v ? '✓ ' : ''}{o.t}</span>
+                <span className="mt-1 block text-base text-brand-900/75">{o.d}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+                <div>
+          <label className="text-base font-semibold">
+            {form.poster_type === 'AGENT' ? 'Letter of authority' : form.poster_type === 'STUDENT' ? 'Proof (optional)' : 'Proof of ownership'}{' '}
+            <span className="font-normal text-brand-900/50">(private, only admins see it)</span>
+          </label>
+          <p className="mt-1 text-base text-brand-900/80">
+            {form.poster_type === 'AGENT'
+              ? 'A signed letter from the owner allowing you to advertise this room.'
+              : 'A rent receipt, a tenancy agreement, or an electricity or water bill with the owner’s name on it. Photo or PDF, under 8MB.'}
+          </p>
+
+          {proofFile ? (
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <span className="text-base font-semibold text-brand-700">✓ {proofFile.name}</span>
+              <button type="button" onClick={() => setProofFile(null)}
+                      className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">
+                Remove
+              </button>
+            </div>
+          ) : (
+            <input type="file" accept="image/*,application/pdf" onChange={(e) => setProofFile(e.target.files[0] || null)}
+                   className="mt-2 block w-full text-base file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:font-semibold file:text-brand-700" />
+          )}
+        </div>
+
         <div>
           <label className="text-sm font-semibold">Listing title</label>
           <input value={form.title} onChange={(e) => update('title', e.target.value)}
@@ -362,10 +436,15 @@ export default function PostListing() {
 
           <div className="mt-5">
             <label className="text-sm font-medium text-brand-900/70">More photos (optional, up to 4)</label>
-            <input type="file" accept="image/*" multiple
+            <input key={extras.length === 0 ? 'empty' : 'full'} type="file" accept="image/*" multiple
                    onChange={(e) => setExtras(Array.from(e.target.files).slice(0, 4))}
                    className="mt-1 block w-full text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:font-semibold file:text-brand-700" />
-            {extras.length > 0 && <p className="mt-1 text-xs text-brand-900/60">{extras.length} extra photo(s) selected</p>}
+            {extras.length > 0 && (
+              <div className="mt-2 flex items-center gap-3">
+                <p className="text-base text-brand-900/80">{extras.length} extra photo(s) selected</p>
+                <button type="button" onClick={() => setExtras([])} className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">Clear extra photos</button>
+              </div>
+            )}
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import AdminReviewPanel from '../components/AdminReviewPanel';
 import { toWhatsApp, formatTag, periodLabel } from '../utils/helpers';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -70,7 +71,7 @@ export default function Admin() {
     }
     init();
   }, []);
-  
+
   async function fetchAll() {
     setLoading(true);
     const [listRes, areaRes] = await Promise.all([
@@ -82,11 +83,10 @@ export default function Admin() {
       setLoading(false);
       return;
     }
-    const names = Object.fromEntries((areaRes.data || []).map((a) => [a.id, a.name]));
+    const names = Object.fromEntries((areaRes.data || []).map((x) => [x.id, x.name]));
     setAll((listRes.data || []).map((l) => ({ ...l, areas: { name: names[l.area_id] } })));
     setLoading(false);
   }
-
 
   function startReject(item) {
     setRejecting(item);
@@ -236,7 +236,6 @@ export default function Admin() {
       <p className="text-sm font-semibold text-brand-600">Admin</p>
       <h1 className="mt-1 text-3xl font-extrabold tracking-tight">Manage listings</h1>
       <p className="mt-1 text-brand-900/70">Approve new posts, reject them with a reason, or delete test and fake listings.</p>
-      <Link to="/admin/reports" className="mt-3 inline-block text-sm font-semibold text-brand-700 hover:text-brand-600">Student reports →</Link>
 
       {notice && (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-brand-50 p-3 text-sm text-brand-900">
@@ -299,11 +298,8 @@ export default function Admin() {
                 {renderRejectPanel(item)}
 
                 {rejecting?.id !== item.id && (
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <button disabled={busyId === item.id} onClick={() => setStatus(item, 'ACTIVE')} className={`${btn} bg-brand-700 text-white hover:bg-brand-600`}>Approve &amp; Publish</button>
-                    <button disabled={busyId === item.id} onClick={() => startReject(item)} className={`${btn} border border-red-200 text-red-600 hover:bg-red-50`}>Reject…</button>
-                    <button disabled={busyId === item.id} onClick={() => handleDelete(item)} className={`${btn} text-brand-900/60 hover:text-red-600`}>Delete</button>
-                  </div>
+                  <AdminReviewPanel item={item} onChanged={fetchAll}
+                                    onReject={() => startReject(item)} onDelete={() => handleDelete(item)} />
                 )}
               </article>
             );

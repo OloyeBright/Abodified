@@ -41,15 +41,26 @@ export function formatDistance(km) {
 }
 
 
-// ---- Paste this at the very BOTTOM of src/utils/helpers.js ----
-
-// Shrinks a big phone photo to a web-friendly size WITHOUT visible quality loss:
-// longest side 2000px, JPEG quality 0.85. A 6MB photo usually becomes 300-700KB.
-export async function compressImage(file, maxEdge = 2000, quality = 0.85) {
-  if (file.size < 400 * 1024) return file; // already small, leave it alone
+// REPLACE the old compressImage function in src/utils/helpers.js with this one.
+// It keeps the poster's original file whenever possible, so nothing is lost.
+// Only photos that are too big are shrunk, and they are saved at high quality.
+export async function compressImage(file, maxEdge = 2400, quality = 0.92) {
+  const MAX_BYTES = 5 * 1024 * 1024; // the upload limit used by the form
+  let bitmap;
   try {
     // "from-image" keeps the photo the right way up
-    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  } catch (e) {
+    return file; // the browser cannot read it: upload the original untouched
+  }
+
+  const fits = bitmap.width <= maxEdge && bitmap.height <= maxEdge;
+  if (fits && file.size <= MAX_BYTES) {
+    if (bitmap.close) bitmap.close();
+    return file; // already a good size: upload the original bytes, no re-encoding
+  }
+
+  try {
     const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
     const w = Math.round(bitmap.width * scale);
     const h = Math.round(bitmap.height * scale);
@@ -58,18 +69,18 @@ export async function compressImage(file, maxEdge = 2000, quality = 0.85) {
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';            // PNGs with transparency get a white background
+    ctx.fillStyle = '#ffffff';            // transparent PNGs get a white background
     ctx.fillRect(0, 0, w, h);
+    ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(bitmap, 0, 0, w, h);
     if (bitmap.close) bitmap.close();
 
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
     if (!blob || blob.size >= file.size) return file; // never make it bigger
-
     const name = file.name.replace(/\.[^.]+$/, '') + '.jpg';
     return new File([blob], name, { type: 'image/jpeg' });
   } catch (e) {
-    return file; // if anything fails, upload the original
+    return file;
   }
 }
