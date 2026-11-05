@@ -35,6 +35,7 @@ export default function ReportListing({ listingId, user }) {
     setSending(false);
 
     if (err) {
+      if (err.code === '42501') return setError('Chat with the owner on WhatsApp first. You can report a room after you have contacted the owner.');
       if (err.code === '23505') return setError('You have already reported this room. Our team will look at it.');
       return setError('Could not send your report: ' + err.message);
     }

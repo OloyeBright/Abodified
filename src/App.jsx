@@ -1,19 +1,22 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
+import BackBar from './components/BackBar';
 import ErrorBoundary from './components/ErrorBoundary';
+import AccountTypeGate from './components/AccountTypeGate';
 import Home from './pages/Home';
 import Browse from './pages/Browse';
 import PostListing from './pages/PostListing';
 import ListingDetail from './pages/ListingDetail';
 import Admin from './pages/Admin';
+import AdminReports from './pages/AdminReports';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Notifications from './pages/Notifications';
-import AdminReports from './pages/AdminReports';
 import MyListings from './pages/MyListings';
+import Profile from './pages/Profile';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -40,9 +43,11 @@ function AppRoutes() {
         <Route path="/signup" element={<SignUp />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/my-listings" element={<MyListings />} />
+        <Route path="/settings" element={<Profile />} />
+        <Route path="/u/:id" element={<Profile />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </ErrorBoundary>
   );
@@ -53,6 +58,8 @@ export default function App() {
     <Router>
       <ScrollToTop />
       <Navbar />
+      <BackBar />
+      <AccountTypeGate />
       <AppRoutes />
     </Router>
   );

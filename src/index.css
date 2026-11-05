@@ -695,6 +695,43 @@ a.logo, a.btn { text-decoration: none; }
 .bell:hover { background: var(--sun); }
 .bell__dot { position: absolute; top: -5px; right: -5px; min-width: 19px; height: 19px; padding: 0 5px; display: grid; place-items: center; border: 2px solid #fff; border-radius: 999px; background: #e5484d; color: #fff; font-size: 11px; font-weight: 800; }
 
-@media (max-width: 560px) {
-  .gal-arrow { width: 40px; height: 40px; }
+/* ===== Responsive on every screen: paste at the VERY BOTTOM of src/index.css ===== */
+html, body { max-width: 100%; overflow-x: hidden; }
+img, video, iframe { max-width: 100%; }
+
+/* Stops iPhones zooming in when a field is tapped, and makes taps easy to hit */
+input, select, textarea { font-size: 16px; }
+button, .btn { min-height: 44px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+
+/* Text scales with the screen */
+.hero h1 { font-size: clamp(2rem, 8vw, 4rem); line-height: 1.08; }
+.section-heading h2 { font-size: clamp(1.6rem, 6vw, 2.75rem); }
+
+/* Grids: one column on phones, more on bigger screens */
+.listing-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+@media (min-width: 640px) { .listing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .listing-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr !important; }
+  .hero__visual { min-height: 0; }
+  .value-grid, .how, .footer-main { grid-template-columns: 1fr !important; }
+  .listing-card__footer { flex-wrap: wrap; gap: 8px; }
+}
+
+@media (max-width: 420px) {
+  .hero__actions { flex-direction: column; align-items: stretch; }
+  .hero__actions .btn { width: 100%; }
+  .sticker { width: 84px; height: 84px; right: 0; }
+  .floating-card { max-width: 78%; }
+  .safe-card, .about-card { padding: 16px; }
+  .trust-line { flex-wrap: wrap; gap: 8px 16px; }
+  .area-chips a { font-size: 12px; padding: 6px 12px; }
+}
+
+/* Gallery arrows stay usable on very small screens */
+@media (max-width: 380px) {
+  .gal-arrow { width: 36px; height: 36px; }
+  .gal-chip { font-size: 11px; padding: 5px 9px; }
 }

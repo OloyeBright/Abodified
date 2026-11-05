@@ -5,6 +5,12 @@ import { supabase } from '../supabaseClient';
 const inputClass =
   'mt-1 w-full rounded-xl border border-brand-100 bg-white px-4 py-3 outline-none focus:border-brand-600';
 
+const TYPES = [
+  { v: 'STUDENT', t: 'I am a student', d: 'Looking for a room, or renting one to sublet.' },
+  { v: 'AGENT', t: 'I am an agent', d: 'I advertise rooms for owners.' },
+  { v: 'LANDLORD', t: 'I am a landlord', d: 'I own the rooms I advertise.' },
+];
+
 export default function SignUp() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -13,6 +19,7 @@ export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [accountType, setAccountType] = useState('STUDENT');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [info, setInfo] = useState('');
@@ -21,15 +28,16 @@ export default function SignUp() {
     e.preventDefault();
     setErrorMsg('');
     setInfo('');
+    if (fullName.trim().length < 2) return setErrorMsg('Please enter your name.');
     if (password.length < 6) return setErrorMsg('Password must be at least 6 characters.');
     if (password !== confirm) return setErrorMsg('The two passwords do not match.');
 
     setLoading(true);
-       const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
-        data: { full_name: fullName.trim() },
+        data: { full_name: fullName.trim(), account_type: accountType },
         emailRedirectTo: `${window.location.origin}/login?confirmed=1`,
       },
     });
@@ -41,12 +49,27 @@ export default function SignUp() {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 py-14">
-      <div className="rounded-3xl border border-brand-100 bg-white p-8 shadow-sm">
+    <div className="mx-auto max-w-md px-4 py-10 sm:py-14">
+      <div className="rounded-3xl border border-brand-100 bg-white p-6 shadow-sm sm:p-8">
         <h1 className="text-3xl font-extrabold tracking-tight">Create your account</h1>
         <p className="mt-1 text-sm text-brand-900/70">Join Abodified to find or post a room.</p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div>
+            <p className="text-sm font-semibold">Which one describes you?</p>
+            <div className="mt-2 grid gap-2">
+              {TYPES.map((o) => (
+                <button key={o.v} type="button" onClick={() => setAccountType(o.v)}
+                        className={`rounded-2xl border-2 p-3 text-left ${
+                          accountType === o.v ? 'border-brand-600 bg-brand-50' : 'border-brand-100 hover:border-brand-600'
+                        }`}>
+                  <span className="block font-bold">{accountType === o.v ? '✓ ' : ''}{o.t}</span>
+                  <span className="block text-sm text-brand-900/70">{o.d}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="text-sm font-semibold">Full name</label>
             <input required autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)}
@@ -60,14 +83,12 @@ export default function SignUp() {
           <div>
             <label className="text-sm font-semibold">Password</label>
             <input type="password" required autoComplete="new-password" value={password}
-                   onChange={(e) => setPassword(e.target.value)}
-                   placeholder="At least 6 characters" className={inputClass} />
+                   onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" className={inputClass} />
           </div>
           <div>
             <label className="text-sm font-semibold">Confirm password</label>
             <input type="password" required autoComplete="new-password" value={confirm}
-                   onChange={(e) => setConfirm(e.target.value)}
-                   placeholder="Type the password again" className={inputClass} />
+                   onChange={(e) => setConfirm(e.target.value)} placeholder="Type the password again" className={inputClass} />
           </div>
 
           {errorMsg && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{errorMsg}</p>}

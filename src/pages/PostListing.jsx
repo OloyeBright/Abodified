@@ -71,6 +71,7 @@ export default function PostListing() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
   const [areas, setAreas] = useState([]);
+  const [profileReady, setProfileReady] = useState(null);
   const [ask, dialog] = useConfirm();
 
   const [form, setForm] = useState({
@@ -120,6 +121,16 @@ export default function PostListing() {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user || null);
+
+      if (session?.user) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('profile_locked_at')
+          .eq('id', session.user.id)
+          .maybeSingle();
+        setProfileReady(!!prof?.profile_locked_at);
+      }
+
       const { data } = await supabase.from('areas').select('id, name').order('name');
       setAreas(data || []);
       setChecking(false);
@@ -241,6 +252,20 @@ export default function PostListing() {
     );
   }
 
+  if (user && profileReady === false) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="text-2xl font-extrabold">Set up your profile first</h1>
+        <p className="mt-2 text-base text-brand-900/75">
+          Students need to know who is posting. Add your picture, name and account type once, then you can post rooms.
+        </p>
+        <Link to="/settings" className="mt-6 inline-block rounded-xl bg-brand-700 px-6 py-3 font-semibold text-white hover:bg-brand-600">
+          Set up my profile
+        </Link>
+      </div>
+    );
+  }
+
   if (done) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
@@ -285,6 +310,7 @@ export default function PostListing() {
             ))}
           </div>
         </div>
+
         <div className="rounded-2xl border-2 border-brand-600 bg-brand-50 p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-700 text-sm font-bold text-white">2</span>
@@ -323,6 +349,7 @@ export default function PostListing() {
             </p>
           )}
         </div>
+
         <div>
           <label className="text-sm font-semibold">Listing title</label>
           <input value={form.title} onChange={(e) => update('title', e.target.value)}

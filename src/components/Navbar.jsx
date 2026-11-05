@@ -69,6 +69,7 @@ export default function Navbar() {
           <Link to="/browse">Browse</Link>
           {role === 'admin' && <Link to="/admin">Admin Dashboard</Link>}
           {user && <Link to="/my-listings">My rooms</Link>}
+          {user && <Link to="/settings">My profile</Link>}
 
           <Link to="/post-listing" className="btn btn--secondary">
             Post a Room <Icon name="plus" size={18} />
