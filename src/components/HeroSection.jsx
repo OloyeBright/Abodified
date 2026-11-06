@@ -1,10 +1,8 @@
 import { Link } from 'react-router-dom';
 import Icon from './Icon';
 
-// Stock photo from the design. Replace with your own file later,
-// e.g. put hero.jpg in the "public" folder and use src="/hero.jpg".
-const HERO_IMG =
-  '/hero4.jpg';
+// Your hero photo, saved in the "public" folder as hero4.jpg
+const HERO_IMG = '/hero4.jpg';
 
 // areas comes from Home (loaded from your database)
 export default function HeroSection({ areas = [] }) {
@@ -42,6 +40,10 @@ export default function HeroSection({ areas = [] }) {
         <img
           src={HERO_IMG}
           alt="A bright, tidy student room"
+          width="1200"
+          height="1000"
+          fetchPriority="high"
+          decoding="async"
           onError={(e) => {
             e.currentTarget.style.display = 'none';
             e.currentTarget.parentElement.classList.add('hero__visual--empty');

@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { toWhatsApp } from '../utils/helpers';
+import { useConfirm } from '../components/ConfirmDialog';
 
-// Reasons an admin can give when rejecting a room
 const REJECT_REASONS = [
   'Photos are blurry or too dark',
   'Photos do not show the room clearly',
@@ -36,12 +36,13 @@ export default function Notifications() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [groups, setGroups] = useState([]); // admin: open reports, grouped per room
+  const [groups, setGroups] = useState([]);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(null);
-  const [rejecting, setRejecting] = useState(null); // listing id with the reject panel open
+  const [rejecting, setRejecting] = useState(null);
   const [pick, setPick] = useState('');
   const [note, setNote] = useState('');
+  const [ask, dialog] = useConfirm();
 
   useEffect(() => {
     async function init() {
@@ -65,7 +66,6 @@ export default function Notifications() {
     const { data } = await supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(50);
     setItems(data || []);
     setLoading(false);
-    // Everything shown is now read; the bell updates on the next page change
     await supabase.from('notifications').update({ is_read: true }).eq('is_read', false);
   }
 
@@ -90,7 +90,6 @@ export default function Notifications() {
     await supabase.from('listing_reports').update({ status: 'resolved' }).eq('listing_id', listingId).eq('status', 'open');
   }
 
-  // Change the room's status. The poster is notified with the reason.
   async function applyStatus(g, status, reason) {
     setBusy(g.listing.id);
     const { data, error } = await supabase
@@ -109,8 +108,14 @@ export default function Notifications() {
     loadReports();
   }
 
-  function hide(g) {
-    if (!window.confirm(`Hide "${g.listing.title}" from the site? The poster will be told it was reported.`)) return;
+  async function hide(g) {
+    const ok = await ask({
+      title: 'Hide this room?',
+      message: `"${g.listing.title}" will be hidden from the site. The poster will be told it was reported.`,
+      confirmText: 'Hide room',
+      danger: true,
+    });
+    if (!ok) return;
     const reasons = [...new Set(g.reports.map((r) => r.reason))].join(', ');
     applyStatus(g, 'REJECTED', `Hidden after a student report: ${reasons}`);
   }
@@ -127,7 +132,6 @@ export default function Notifications() {
     loadReports();
   }
 
-  // Message the owner on WhatsApp asking them to correct the room
   async function messageOwner(g) {
     const { data, error } = await supabase.rpc('get_listing_private', { p_listing_id: g.listing.id });
     const row = Array.isArray(data) ? data[0] : data;
@@ -141,7 +145,14 @@ export default function Notifications() {
   }
 
   async function remove(g) {
-    if (!window.confirm(`Delete "${g.listing.title}" permanently?\n\nThis cannot be undone.`)) return;
+    const ok = await ask({
+      title: 'Delete this room?',
+      message: `"${g.listing.title}" will be removed permanently. This cannot be undone.`,
+      confirmText: 'Delete room',
+      danger: true,
+    });
+    if (!ok) return;
+
     setBusy(g.listing.id);
     const { data, error } = await supabase.from('listings').delete().eq('id', g.listing.id).select('id');
     setBusy(null);
@@ -172,6 +183,7 @@ export default function Notifications() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
+      {dialog}
       {notice && (
         <div className="mb-6 flex items-center justify-between gap-3 rounded-xl bg-brand-50 p-3 text-sm text-brand-900">
           <span>{notice}</span>
@@ -179,7 +191,6 @@ export default function Notifications() {
         </div>
       )}
 
-      {/* ---------- ADMIN: reports to review ---------- */}
       {isAdmin && (
         <section className="mb-12">
           <p className="text-sm font-semibold text-red-600">Admin</p>
@@ -280,7 +291,6 @@ export default function Notifications() {
         </section>
       )}
 
-      {/* ---------- Everyone: notification list ---------- */}
       <p className="text-sm font-semibold text-brand-600">Notifications</p>
       <h1 className="mt-1 text-3xl font-extrabold tracking-tight">Updates</h1>
 

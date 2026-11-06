@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import AdminReviewPanel from '../components/AdminReviewPanel';
 import { toWhatsApp, formatTag, periodLabel } from '../utils/helpers';
+import { useConfirm } from '../components/ConfirmDialog';
+import AdminReviewPanel from '../components/AdminReviewPanel';
+import PhotoFrame from '../components/PhotoFrame';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -13,7 +15,6 @@ const BADGE = {
   EXPIRED: 'bg-gray-200 text-gray-700',
 };
 
-// Quick reasons the admin can tap. The poster sees these in their notifications.
 const REASONS = [
   'Photos are blurry or too dark',
   'Photos do not show the room clearly',
@@ -32,7 +33,6 @@ function fmtDate(d) {
   return d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 }
 
-// Turns a public photo link into the file path inside the "listing-photos" bucket
 function photoPath(url) {
   const marker = '/listing-photos/';
   const i = url ? url.indexOf(marker) : -1;
@@ -54,11 +54,10 @@ export default function Admin() {
   const [filter, setFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
-
-  // The rejection form: which listing is being rejected, and the reason typed
   const [rejecting, setRejecting] = useState(null);
   const [reasonPick, setReasonPick] = useState('');
   const [reasonNote, setReasonNote] = useState('');
+  const [ask, dialog] = useConfirm();
 
   useEffect(() => {
     async function init() {
@@ -98,7 +97,6 @@ export default function Admin() {
     return [reasonPick, reasonNote.trim()].filter(Boolean).join(' — ');
   }
 
-  // Approve, re-publish, or reject (reject always needs a reason)
   async function setStatus(item, newStatus, reason) {
     setBusyId(item.id);
     const changes = { status: newStatus };
@@ -129,7 +127,6 @@ export default function Admin() {
     await setStatus(item, 'REJECTED', reason);
   }
 
-  // Optional: also message the poster on WhatsApp with the reason filled in
   function whatsappReason(item) {
     const reason = finalReason() || 'please check your room details.';
     const msg = encodeURIComponent(
@@ -139,7 +136,13 @@ export default function Admin() {
   }
 
   async function handleDelete(item) {
-    if (!window.confirm(`Delete "${item.title}" permanently?\n\nThis cannot be undone.`)) return;
+    const ok = await ask({
+      title: 'Delete this room?',
+      message: `"${item.title}" will be removed permanently. This cannot be undone.`,
+      confirmText: 'Delete room',
+      danger: true,
+    });
+    if (!ok) return;
 
     setBusyId(item.id);
     const { data, error } = await supabase.from('listings').delete().eq('id', item.id).select('id');
@@ -159,7 +162,6 @@ export default function Admin() {
     fetchAll();
   }
 
-  // The reason panel that opens under a listing when rejecting it
   function renderRejectPanel(item) {
     if (rejecting?.id !== item.id) return null;
     return (
@@ -233,6 +235,7 @@ export default function Admin() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
+      {dialog}
       <p className="text-sm font-semibold text-brand-600">Admin</p>
       <h1 className="mt-1 text-3xl font-extrabold tracking-tight">Manage listings</h1>
       <p className="mt-1 text-brand-900/70">Approve new posts, reject them with a reason, or delete test and fake listings.</p>
@@ -278,7 +281,7 @@ export default function Admin() {
                 <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {imgs.slice(0, 8).map((u, i) => (
                     <a key={u + i} href={u} target="_blank" rel="noreferrer" className="block h-28 overflow-hidden rounded-xl bg-brand-50">
-                      <img src={u} alt="" className="h-full w-full object-cover" />
+                      <PhotoFrame src={u} className="h-full w-full" />
                     </a>
                   ))}
                   {imgs.length === 0 && <p className="text-sm text-brand-900/50">No photos</p>}
@@ -333,7 +336,7 @@ export default function Admin() {
                 <article key={item.id} className="rounded-2xl border border-brand-100 bg-white p-4">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                     <div className="h-24 w-full shrink-0 overflow-hidden rounded-xl bg-brand-50 sm:h-20 sm:w-28">
-                      {cover && <img src={cover} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+                      {cover && <PhotoFrame src={cover} className="h-full w-full" />}
                     </div>
 
                     <div className="min-w-0 flex-1">

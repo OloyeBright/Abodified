@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { normalizeNgNumber } from '../utils/helpers';
+import { useConfirm } from '../components/ConfirmDialog';
 
 const ROOM_TYPES = ['Single Room', 'Self Contain', 'Mini Flat', 'Room & Parlour'];
 const UTILITIES = [
@@ -60,6 +61,7 @@ export default function MyListings() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [ask, dialog] = useConfirm();
 
   useEffect(() => {
     async function init() {
@@ -102,13 +104,22 @@ export default function MyListings() {
     }
   }
 
-  // PRD 8.1: reconfirming keeps the room live and resets its 14 days
   const reconfirm = (item) =>
     run(item, () => supabase.rpc('reconfirm_listing', { p_listing_id: item.id }),
       '✅ Reconfirmed. Your room is live for another 14 days.');
 
-  function markUnavailable(item) {
-    if (!window.confirm(`Mark "${item.title}" as unavailable? Students will no longer see it.`)) return;
+  const relist = (item) =>
+    run(item, () => supabase.rpc('request_review', { p_listing_id: item.id }),
+      'Sent back to the admin for review.');
+
+  async function markUnavailable(item) {
+    const ok = await ask({
+      title: 'Mark as unavailable?',
+      message: `"${item.title}" will be hidden from students until you make it available again.`,
+      confirmText: 'Mark unavailable',
+      danger: true,
+    });
+    if (!ok) return;
     run(item, () => supabase.rpc('mark_listing_unavailable', { p_listing_id: item.id }),
       'Marked as unavailable.');
   }
@@ -272,6 +283,7 @@ export default function MyListings() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
+      {dialog}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-brand-600">My rooms</p>
@@ -291,7 +303,7 @@ export default function MyListings() {
 
       {expiringSoon > 0 && (
         <div className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-          ⏳ {expiringSoon} of your rooms expire within 2 days. Tap <strong>Reconfirm availability</strong> on each one that is still available.
+          ⏳ {expiringSoon} of your rooms expire within 2 days. Tap <strong>Reconfirm</strong> on each one that is still available.
         </div>
       )}
 
@@ -311,7 +323,6 @@ export default function MyListings() {
           const cover = item.photos?.[0] || item.photo_url;
           const left = daysLeft(item.expires_at);
           const working = busy === item.id;
-          const canEdit = item.status === 'ACTIVE' || item.status === 'PENDING';
 
           return (
             <article key={item.id} className="rounded-2xl border border-brand-100 bg-white p-5 shadow-sm">
@@ -333,7 +344,7 @@ export default function MyListings() {
                     </p>
                   )}
                   {item.status === 'EXPIRED' && (
-                    <p className="mt-1 text-xs text-brand-900/60">Expired on {fmt(item.expires_at)}. Post the room again to list it.</p>
+                    <p className="mt-1 text-xs text-brand-900/60">Expired on {fmt(item.expires_at)}. Send it for review to show it again.</p>
                   )}
                   {item.status === 'REJECTED' && item.rejection_reason && (
                     <p className="mt-1 rounded-lg bg-red-50 p-2 text-xs text-red-700">Reason: {item.rejection_reason}</p>
@@ -347,18 +358,30 @@ export default function MyListings() {
                     Reconfirm availability
                   </button>
                 )}
-                {canEdit && (
+                {item.status === 'EXPIRED' && (
+                  <button disabled={working} onClick={() => relist(item)} className={btnPrimary}>
+                    Send for review to relist
+                  </button>
+                )}
+                {item.status === 'UNAVAILABLE' && (
+                  <button disabled={working} onClick={() => relist(item)} className={btnPrimary}>
+                    Make available again
+                  </button>
+                )}
+                {item.status === 'REJECTED' && (
+                  <button disabled={working} onClick={() => openEdit(item)} className={btnPrimary}>
+                    Edit &amp; resubmit
+                  </button>
+                )}
+                {(item.status === 'ACTIVE' || item.status === 'PENDING') && (
                   <button disabled={working} onClick={() => openEdit(item)} className={btnSecondary}>
                     Edit
                   </button>
                 )}
-                {canEdit && (
+                {(item.status === 'ACTIVE' || item.status === 'PENDING') && (
                   <button disabled={working} onClick={() => markUnavailable(item)} className={btnWarn}>
                     Mark unavailable
                   </button>
-                )}
-                {!canEdit && (
-                  <Link to="/post-listing" className={btnPrimary}>Post a new room</Link>
                 )}
               </div>
             </article>
