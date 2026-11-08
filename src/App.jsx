@@ -17,6 +17,9 @@ import ResetPassword from './pages/ResetPassword';
 import Notifications from './pages/Notifications';
 import MyListings from './pages/MyListings';
 import Profile from './pages/Profile';
+import Verify from './pages/Verify';
+import AdminUsers from './pages/AdminUsers';
+
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -48,6 +51,8 @@ function AppRoutes() {
         <Route path="/settings" element={<Profile />} />
         <Route path="/u/:id" element={<Profile />} />
         <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/verify" element={<Verify />} />
+        <Route path="/admin/users" element={<AdminUsers />} />
       </Routes>
     </ErrorBoundary>
   );

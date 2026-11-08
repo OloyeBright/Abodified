@@ -36,7 +36,7 @@ export default function Profile() {
   const own = !id || (me && id === me.id);
   const targetId = id || me?.id;
   const locked = !!profile?.locked;
-  const signupType = ['STUDENT', 'AGENT', 'LANDLORD'].includes(me?.user_metadata?.account_type)
+  const signupType = ['STUDENT', 'LANDLORD'].includes(me?.user_metadata?.account_type)
     ? me.user_metadata.account_type
     : null;
 
@@ -244,7 +244,6 @@ export default function Profile() {
                   <div className="mt-2 grid gap-2">
                     {[
                       { v: 'STUDENT', t: 'I am a student' },
-                      { v: 'AGENT', t: 'I am an agent' },
                       { v: 'LANDLORD', t: 'I am a landlord' },
                     ].map((o) => (
                       <button key={o.v} type="button" onClick={() => setForm({ ...form, account_type: o.v })}

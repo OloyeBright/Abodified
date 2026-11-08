@@ -83,4 +83,13 @@ export async function compressImage(file, maxEdge = 2400, quality = 0.92) {
   } catch (e) {
     return file;
   }
+
+}
+
+
+// SHA-256 fingerprint of a file (used to spot the same document on two accounts)
+export async function sha256Hex(file) {
+  const buf = await file.arrayBuffer();
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }

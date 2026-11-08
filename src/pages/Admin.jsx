@@ -6,6 +6,8 @@ import { useConfirm } from '../components/ConfirmDialog';
 import AdminReviewPanel from '../components/AdminReviewPanel';
 import PhotoFrame from '../components/PhotoFrame';
 
+
+
 const DAY = 24 * 60 * 60 * 1000;
 
 const BADGE = {
@@ -239,6 +241,8 @@ export default function Admin() {
       <p className="text-sm font-semibold text-brand-600">Admin</p>
       <h1 className="mt-1 text-3xl font-extrabold tracking-tight">Manage listings</h1>
       <p className="mt-1 text-brand-900/70">Approve new posts, reject them with a reason, or delete test and fake listings.</p>
+        <Link to="/admin/users" className="mt-3 inline-block text-sm font-semibold text-brand-700 hover:text-brand-600">Users and identity checks →</Link>
+
 
       {notice && (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-brand-50 p-3 text-sm text-brand-900">

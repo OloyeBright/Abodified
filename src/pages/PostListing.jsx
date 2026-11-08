@@ -1,12 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { useConfirm } from '../components/ConfirmDialog';
-import { normalizeNgNumber, compressImage } from '../utils/helpers';
+import { normalizeNgNumber, compressImage, sha256Hex } from '../utils/helpers';
 
 const ROOM_TYPES = ['Single Room', 'Self Contain', 'Mini Flat', 'Room & Parlour'];
 
-// "key" is what gets saved (ListingCard / ListingDetail read these keys)
 const UTILITIES = [
   { key: 'water', label: 'Water' },
   { key: 'security', label: 'Security' },
@@ -15,25 +13,23 @@ const UTILITIES = [
   { key: 'privateToilet', label: 'Private toilet' },
 ];
 
-// 4 required photos, in this order. ListingDetail shows the same captions.
 const PHOTO_SLOTS = [
   { key: 'room', label: 'Main room', hint: 'The whole room, from the door' },
   { key: 'bath', label: 'Toilet & bathroom', hint: 'Toilet and shower area' },
   { key: 'kitchen', label: 'Kitchen & water', hint: 'Kitchen, tap or tank' },
   { key: 'outside', label: 'Compound / outside', hint: 'Entrance, gate or street' },
 ];
-// Optional photos for bigger places (2-bedroom flats, rooms with a parlour)
 const OPTIONAL_SLOTS = [
   { key: 'bedroom2', label: 'Second bedroom', hint: 'For 2-bedroom flats' },
   { key: 'parlour', label: 'Parlour', hint: 'The sitting room, if there is one' },
 ];
-const MAX_MB = 25;          // the photo you pick can be big, we shrink it before uploading
-const MAX_UPLOAD_MB = 5;    // the shrunk file must fit under this
+const MAX_MB = 25;
+const MAX_UPLOAD_MB = 5;
+const MAX_PROOF_MB = 8;
 
 const inputClass =
   'mt-1 w-full rounded-xl border border-brand-100 bg-white px-4 py-3 outline-none focus:border-brand-600';
 
-// One photo box. Shows a preview once a file is chosen.
 function PhotoSlot({ label, hint, file, onChange }) {
   const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
 
@@ -70,9 +66,8 @@ function PhotoSlot({ label, hint, file, onChange }) {
 export default function PostListing() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
+  const [profile, setProfile] = useState(null);
   const [areas, setAreas] = useState([]);
-  const [profileReady, setProfileReady] = useState(null);
-  const [ask, dialog] = useConfirm();
 
   const [form, setForm] = useState({
     title: '',
@@ -84,14 +79,12 @@ export default function PostListing() {
     exact_address: '',
     contact_number: '',
     description: '',
-    poster_type: 'LANDLORD',
   });
   const [utilities, setUtilities] = useState({});
   const [slots, setSlots] = useState({ room: null, bath: null, kitchen: null, outside: null, bedroom2: null, parlour: null });
   const [extras, setExtras] = useState([]);
   const [proofFile, setProofFile] = useState(null);
 
-  // WhatsApp self-check
   const [waTested, setWaTested] = useState(false);
   const [waConfirmed, setWaConfirmed] = useState(false);
 
@@ -99,13 +92,13 @@ export default function PostListing() {
   const [errorMsg, setErrorMsg] = useState('');
   const [done, setDone] = useState(false);
 
-  const cleanNumber = normalizeNgNumber(form.contact_number); // null if invalid
+  const cleanNumber = normalizeNgNumber(form.contact_number);
+  const isVerified = !!profile?.verified_until && new Date(profile.verified_until) > new Date();
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  // Digits only. Changing the number cancels any earlier confirmation.
   function handleNumber(e) {
     update('contact_number', e.target.value.replace(/\D/g, ''));
     setWaTested(false);
@@ -120,15 +113,16 @@ export default function PostListing() {
   useEffect(() => {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
+      const u = session?.user || null;
+      setUser(u);
 
-      if (session?.user) {
+      if (u) {
         const { data: prof } = await supabase
           .from('profiles')
-          .select('profile_locked_at')
-          .eq('id', session.user.id)
+          .select('profile_locked_at, account_type, verified_until')
+          .eq('id', u.id)
           .maybeSingle();
-        setProfileReady(!!prof?.profile_locked_at);
+        setProfile(prof || null);
       }
 
       const { data } = await supabase.from('areas').select('id, name').order('name');
@@ -142,15 +136,11 @@ export default function PostListing() {
     e.preventDefault();
     setErrorMsg('');
 
-    // ---- 1. Validate everything before sending anything ----
     if (!form.title.trim()) return setErrorMsg('Please enter a listing title.');
     if (!form.accommodation_type) return setErrorMsg('Please choose a room type.');
     if (!form.area_id) return setErrorMsg('Please choose an area.');
-    if (proofFile && proofFile.size > 8 * 1024 * 1024) return setErrorMsg('The proof file must be under 8MB.');
-    if (!proofFile && form.poster_type !== 'STUDENT') {
-      const ok = await ask({ title: 'Submit without proof?', message: 'The room will be saved, but it cannot go live until proof is checked.', confirmText: 'Submit anyway', cancelText: 'Go back and add proof' });
-      if (!ok) return;
-    }
+    if (!proofFile) return setErrorMsg('Please upload proof that this house is yours. A rent receipt, a tenancy agreement, or a utility bill in your name.');
+    if (proofFile.size > MAX_PROOF_MB * 1024 * 1024) return setErrorMsg(`The proof file must be under ${MAX_PROOF_MB}MB.`);
     if (!form.rent_amount || Number(form.rent_amount) <= 0) return setErrorMsg('Please enter the rent amount.');
     if (!form.exact_address.trim()) return setErrorMsg('Please enter the exact address (only admins see this).');
     if (!cleanNumber) return setErrorMsg('Enter a valid Nigerian WhatsApp number using digits only, e.g. 08012345678.');
@@ -166,22 +156,19 @@ export default function PostListing() {
       ...OPTIONAL_SLOTS.filter((s) => slots[s.key]).map((s) => ({ key: s.key, file: slots[s.key] })),
       ...extras.map((file, i) => ({ key: `extra${i + 1}`, file })),
     ];
-    const allFiles = entries.map((e) => e.file);
-    for (const f of allFiles) {
-      if (!f.type.startsWith('image/')) return setErrorMsg(`"${f.name}" is not an image.`);
-      if (f.size > MAX_MB * 1024 * 1024) return setErrorMsg(`"${f.name}" is bigger than ${MAX_MB}MB.`);
+    for (const en of entries) {
+      if (!en.file.type.startsWith('image/')) return setErrorMsg(`"${en.file.name}" is not an image.`);
+      if (en.file.size > MAX_MB * 1024 * 1024) return setErrorMsg(`"${en.file.name}" is bigger than ${MAX_MB}MB.`);
     }
 
     setSubmitting(true);
 
-    // ---- 2. Upload every photo, collect the public links ----
     const urls = [];
-    for (let i = 0; i < allFiles.length; i++) {
-      // Shrink first: keeps good quality but makes pages load fast on phone data
-      const file = await compressImage(allFiles[i]);
+    for (let i = 0; i < entries.length; i++) {
+      const file = await compressImage(entries[i].file);
       if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
         setSubmitting(false);
-        return setErrorMsg(`"${allFiles[i].name}" is still too large. Please pick a smaller photo.`);
+        return setErrorMsg(`"${entries[i].file.name}" is still too large. Please pick a smaller photo.`);
       }
       const ext = file.name.split('.').pop();
       const path = `${user.id}/${Date.now()}-${entries[i].key}.${ext}`;
@@ -193,19 +180,15 @@ export default function PostListing() {
       urls.push(supabase.storage.from('listing-photos').getPublicUrl(path).data.publicUrl);
     }
 
-    // ---- 2b. Upload the private proof document (admins only) ----
-    let proofPath = null;
-    if (proofFile) {
-      const pext = proofFile.name.split('.').pop();
-      proofPath = `${user.id}/${Date.now()}-proof.${pext}`;
-      const { error: pErr } = await supabase.storage.from('listing-proof').upload(proofPath, proofFile);
-      if (pErr) {
-        setSubmitting(false);
-        return setErrorMsg('Proof upload failed: ' + pErr.message);
-      }
+    const proofHash = await sha256Hex(proofFile);
+    const pext = proofFile.name.split('.').pop();
+    const proofPath = `${user.id}/${Date.now()}-proof.${pext}`;
+    const { error: pErr } = await supabase.storage.from('listing-proof').upload(proofPath, proofFile);
+    if (pErr) {
+      setSubmitting(false);
+      return setErrorMsg('Proof upload failed: ' + pErr.message);
     }
 
-    // ---- 3. Save the listing as PENDING ----
     const { error: insertError } = await supabase.from('listings').insert({
       owner_id: user.id,
       title: form.title.trim(),
@@ -216,12 +199,13 @@ export default function PostListing() {
       rent_period: form.rent_period,
       utilities,
       exact_address: form.exact_address.trim(),
-      contact_number: cleanNumber,          // saved as 234XXXXXXXXXX
+      contact_number: cleanNumber,
       description: form.description.trim(),
-      photo_url: urls[0],                   // cover photo (column already exists)
-      photos: urls,                         // all photos (new column)
-      poster_type: form.poster_type,
+      photo_url: urls[0],
+      photos: urls,
+      poster_type: 'LANDLORD',
       proof_path: proofPath,
+      proof_hash: proofHash,
       status: 'PENDING',
     });
 
@@ -230,14 +214,10 @@ export default function PostListing() {
       return setErrorMsg('Could not save listing: ' + insertError.message);
     }
 
-    // First-time posters become "poster"
-    await supabase.from('profiles').update({ role: 'poster' }).eq('id', user.id).eq('role', 'seeker');
-
     setSubmitting(false);
     setDone(true);
   }
 
-  // ---------- What the page shows ----------
   if (checking) return <p className="py-20 text-center text-brand-900/60">Loading…</p>;
 
   if (!user) {
@@ -252,15 +232,41 @@ export default function PostListing() {
     );
   }
 
-  if (user && profileReady === false) {
+  if (!profile?.profile_locked_at) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
         <h1 className="text-2xl font-extrabold">Set up your profile first</h1>
-        <p className="mt-2 text-base text-brand-900/75">
-          Students need to know who is posting. Add your picture, name and account type once, then you can post rooms.
-        </p>
+        <p className="mt-2 text-base text-brand-900/75">Save your picture, name and account type once. Then you can continue.</p>
         <Link to="/settings" className="mt-6 inline-block rounded-xl bg-brand-700 px-6 py-3 font-semibold text-white hover:bg-brand-600">
           Set up my profile
+        </Link>
+      </div>
+    );
+  }
+
+  if (profile.account_type !== 'LANDLORD') {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="text-2xl font-extrabold">Only landlords can post rooms</h1>
+        <p className="mt-2 text-base text-brand-900/75">
+          Students can browse rooms, contact owners, ask questions and leave reviews.
+        </p>
+        <Link to="/browse" className="mt-6 inline-block rounded-xl bg-brand-700 px-6 py-3 font-semibold text-white hover:bg-brand-600">
+          Browse rooms
+        </Link>
+      </div>
+    );
+  }
+
+  if (!isVerified) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="text-2xl font-extrabold">Verify your identity first</h1>
+        <p className="mt-2 text-base text-brand-900/75">
+          Before you post, we need to check your identity once. It stays valid for 12 months.
+        </p>
+        <Link to="/verify" className="mt-6 inline-block rounded-xl bg-brand-700 px-6 py-3 font-semibold text-white hover:bg-brand-600">
+          Verify my identity
         </Link>
       </div>
     );
@@ -273,7 +279,7 @@ export default function PostListing() {
           <p className="text-4xl">✅</p>
           <h1 className="mt-3 text-2xl font-extrabold">Submitted for review</h1>
           <p className="mt-2 text-sm text-brand-900/70">
-            An admin will check your listing. Once approved it will appear on the homepage for 14 days.
+            An admin will check your listing and your proof. Once approved it will appear on the homepage for 14 days.
           </p>
           <Link to="/" className="mt-6 inline-block rounded-xl bg-brand-700 px-6 py-3 font-semibold text-white hover:bg-brand-600">
             Back to home
@@ -285,46 +291,19 @@ export default function PostListing() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
-      {dialog}
       <p className="text-sm font-semibold text-brand-600">Post a room</p>
       <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">Tell students about your room.</h1>
       <p className="mt-2 text-brand-900/70">Every listing is reviewed before it goes live.</p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-6 rounded-3xl border border-brand-100 bg-white p-6 shadow-sm sm:p-8">
-        <div>
-          <p className="text-lg font-bold">Which one describes you?</p>
-          <div className="mt-3 grid gap-3">
-            {[
-              { v: 'LANDLORD', t: 'I own this room', d: 'I am the landlord, or the owner of the house.' },
-              { v: 'AGENT', t: 'I am an agent', d: 'The owner gave me this room to advertise for them.' },
-              { v: 'STUDENT', t: 'I am a student', d: 'I rent this room and I want to sublet it to another student.' },
-            ].map((o) => (
-              <button key={o.v} type="button"
-                      onClick={() => { update('poster_type', o.v); setProofFile(null); }}
-                      className={`rounded-2xl border-2 p-4 text-left transition ${
-                        form.poster_type === o.v ? 'border-brand-600 bg-brand-50' : 'border-brand-100 bg-white hover:border-brand-600'
-                      }`}>
-                <span className="block text-lg font-bold">{form.poster_type === o.v ? '✓ ' : ''}{o.t}</span>
-                <span className="mt-1 block text-base text-brand-900/75">{o.d}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div className="rounded-2xl border-2 border-brand-600 bg-brand-50 p-5 shadow-sm">
           <div className="flex items-center gap-3">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-700 text-sm font-bold text-white">2</span>
-            <p className="text-lg font-bold">
-              {form.poster_type === 'AGENT' ? 'Add the owner’s permission letter'
-                : form.poster_type === 'STUDENT' ? 'Add proof (optional)'
-                : 'Add proof that this house is yours'}
-            </p>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-700 text-sm font-bold text-white">1</span>
+            <p className="text-lg font-bold">Add proof that this house is yours</p>
           </div>
-
           <p className="mt-2 text-base text-brand-900/80">
-            {form.poster_type === 'AGENT'
-              ? 'A signed letter from the owner allowing you to advertise this room.'
-              : 'A rent receipt, a tenancy agreement, or an electricity or water bill with the owner’s name on it. Photo or PDF, under 8MB. Only admins see this.'}
+            A rent receipt, a tenancy agreement, or an electricity or water bill with your name on it. Photo or PDF, under {MAX_PROOF_MB}MB.
+            Only admins see this.
           </p>
 
           {proofFile ? (
@@ -332,7 +311,7 @@ export default function PostListing() {
               <span className="text-base font-semibold text-brand-700">✓ {proofFile.name}</span>
               <button type="button" onClick={() => setProofFile(null)}
                       className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">
-                Remove
+                Remove this file
               </button>
             </div>
           ) : (
@@ -341,12 +320,6 @@ export default function PostListing() {
               <input type="file" accept="image/*,application/pdf" className="hidden"
                      onChange={(e) => setProofFile(e.target.files[0] || null)} />
             </label>
-          )}
-
-          {!proofFile && form.poster_type !== 'STUDENT' && (
-            <p className="mt-3 rounded-xl bg-amber-100 p-3 text-base font-semibold text-amber-900">
-              ⚠ Your room cannot go live without this. You can still post now, and we will message you on WhatsApp.
-            </p>
           )}
         </div>
 
@@ -416,16 +389,12 @@ export default function PostListing() {
                  placeholder="House number, street, landmark" className={inputClass} />
         </div>
 
-        {/* WhatsApp number + self-check */}
         <div>
           <label className="text-sm font-semibold">WhatsApp number</label>
           <div className="mt-1 flex gap-2">
-            <input
-              type="tel" inputMode="numeric" autoComplete="tel" maxLength={13}
-              value={form.contact_number} onChange={handleNumber}
-              placeholder="e.g. 08012345678"
-              className="w-full flex-1 rounded-xl border border-brand-100 bg-white px-4 py-3 outline-none focus:border-brand-600"
-            />
+            <input type="tel" inputMode="numeric" autoComplete="tel" maxLength={13}
+                   value={form.contact_number} onChange={handleNumber} placeholder="e.g. 08012345678"
+                   className="w-full flex-1 rounded-xl border border-brand-100 bg-white px-4 py-3 outline-none focus:border-brand-600" />
             <button type="button" onClick={testWhatsApp} disabled={!cleanNumber}
                     className="shrink-0 rounded-xl border border-brand-600 px-4 text-sm font-semibold text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40">
               Test on WhatsApp
@@ -450,7 +419,6 @@ export default function PostListing() {
                     className={inputClass} />
         </div>
 
-        {/* Photos */}
         <div>
           <p className="text-sm font-semibold">Photos <span className="font-normal text-brand-900/50">(first 4 required, big photos are fine, we shrink them for you)</span></p>
           <div className="mt-2 grid grid-cols-2 gap-3">
@@ -459,22 +427,16 @@ export default function PostListing() {
                          onChange={(f) => setSlots((p) => ({ ...p, [s.key]: f }))} />
             ))}
           </div>
+
           <div className="mt-5">
             <p className="text-sm font-semibold">
               Bigger place? <span className="font-normal text-brand-900/50">(optional)</span>
             </p>
-            <p className="text-xs text-brand-900/60">Add these if you are posting a 2-bedroom flat or the place has a parlour.</p>
             <div className="mt-2 grid grid-cols-2 gap-3">
               {OPTIONAL_SLOTS.map((s) => (
                 <div key={s.key}>
                   <PhotoSlot label={s.label} hint={s.hint} file={slots[s.key]}
                              onChange={(f) => setSlots((p) => ({ ...p, [s.key]: f }))} />
-                  {slots[s.key] && (
-                    <button type="button" onClick={() => setSlots((p) => ({ ...p, [s.key]: null }))}
-                            className="mt-1 text-xs font-semibold text-red-600">
-                      Remove photo
-                    </button>
-                  )}
                 </div>
               ))}
             </div>
@@ -488,7 +450,10 @@ export default function PostListing() {
             {extras.length > 0 && (
               <div className="mt-2 flex items-center gap-3">
                 <p className="text-base text-brand-900/80">{extras.length} extra photo(s) selected</p>
-                <button type="button" onClick={() => setExtras([])} className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">Clear extra photos</button>
+                <button type="button" onClick={() => setExtras([])}
+                        className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">
+                  Clear extra photos
+                </button>
               </div>
             )}
           </div>
@@ -498,7 +463,7 @@ export default function PostListing() {
 
         <button type="submit" disabled={submitting}
                 className="w-full rounded-xl bg-brand-700 py-3.5 font-semibold text-white hover:bg-brand-600 disabled:opacity-60">
-          {submitting ? 'Uploading photos & submitting…' : 'Submit for review'}
+          {submitting ? 'Uploading and submitting…' : 'Submit for review'}
         </button>
       </form>
     </div>

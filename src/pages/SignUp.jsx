@@ -6,9 +6,8 @@ const inputClass =
   'mt-1 w-full rounded-xl border border-brand-100 bg-white px-4 py-3 outline-none focus:border-brand-600';
 
 const TYPES = [
-  { v: 'STUDENT', t: 'I am a student', d: 'Looking for a room, or renting one to sublet.' },
-  { v: 'AGENT', t: 'I am an agent', d: 'I advertise rooms for owners.' },
-  { v: 'LANDLORD', t: 'I am a landlord', d: 'I own the rooms I advertise.' },
+  { v: 'STUDENT', t: 'I am a student', d: 'I am looking for a room, or renting one to sublet.' },
+  { v: 'LANDLORD', t: 'I am a landlord', d: 'I own the room I want to post. You verify your identity before you can post.' },
 ];
 
 export default function SignUp() {
