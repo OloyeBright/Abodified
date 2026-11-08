@@ -258,20 +258,6 @@ export default function PostListing() {
     );
   }
 
-  if (!isVerified) {
-    return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="text-2xl font-extrabold">Verify your identity first</h1>
-        <p className="mt-2 text-base text-brand-900/75">
-          Before you post, we need to check your identity once. It stays valid for 12 months.
-        </p>
-        <Link to="/verify" className="mt-6 inline-block rounded-xl bg-brand-700 px-6 py-3 font-semibold text-white hover:bg-brand-600">
-          Verify my identity
-        </Link>
-      </div>
-    );
-  }
-
   if (done) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
@@ -279,10 +265,12 @@ export default function PostListing() {
           <p className="text-4xl">✅</p>
           <h1 className="mt-3 text-2xl font-extrabold">Submitted for review</h1>
           <p className="mt-2 text-sm text-brand-900/70">
-            An admin will check your listing and your proof. Once approved it will appear on the homepage for 14 days.
+            {isVerified
+              ? 'An admin will check your listing and your proof. Once approved it will appear on the homepage for 14 days.'
+              : 'Your room is saved. It will be reviewed once your identity check is approved.'}
           </p>
-          <Link to="/" className="mt-6 inline-block rounded-xl bg-brand-700 px-6 py-3 font-semibold text-white hover:bg-brand-600">
-            Back to home
+          <Link to="/my-listings" className="mt-6 inline-block rounded-xl bg-brand-700 px-6 py-3 font-semibold text-white hover:bg-brand-600">
+            View my rooms
           </Link>
         </div>
       </div>
@@ -294,6 +282,16 @@ export default function PostListing() {
       <p className="text-sm font-semibold text-brand-600">Post a room</p>
       <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">Tell students about your room.</h1>
       <p className="mt-2 text-brand-900/70">Every listing is reviewed before it goes live.</p>
+
+      {!isVerified && (
+        <div className="mt-6 rounded-2xl bg-amber-50 p-4 text-amber-900">
+          <p className="font-semibold">Your identity check is not approved yet.</p>
+          <p className="mt-1 text-sm">
+            You can fill in and submit this room now. It will be reviewed only after your identity is approved.
+          </p>
+          <Link to="/verify" className="mt-2 inline-block text-sm font-semibold underline">Check my identity status</Link>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-6 rounded-3xl border border-brand-100 bg-white p-6 shadow-sm sm:p-8">
         <div className="rounded-2xl border-2 border-brand-600 bg-brand-50 p-5 shadow-sm">

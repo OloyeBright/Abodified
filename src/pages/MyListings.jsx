@@ -346,6 +346,11 @@ export default function MyListings() {
                   {item.status === 'EXPIRED' && (
                     <p className="mt-1 text-xs text-brand-900/60">Expired on {fmt(item.expires_at)}. Send it for review to show it again.</p>
                   )}
+
+                  {item.status === 'PENDING' && (
+                    <p className="mt-1 text-xs text-brand-900/60">Reviewed once your identity is approved and the proof is checked.</p>
+                  )}
+                  
                   {item.status === 'REJECTED' && item.rejection_reason && (
                     <p className="mt-1 rounded-lg bg-red-50 p-2 text-xs text-red-700">Reason: {item.rejection_reason}</p>
                   )}
