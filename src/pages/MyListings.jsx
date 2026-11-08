@@ -54,6 +54,7 @@ export default function MyListings() {
   const [checking, setChecking] = useState(true);
   const [user, setUser] = useState(null);
   const [items, setItems] = useState([]);
+  const [chats, setChats] = useState([]);
   const [areas, setAreas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
@@ -86,6 +87,8 @@ export default function MyListings() {
       .order('created_at', { ascending: false });
     if (error) setNotice('Could not load your rooms: ' + error.message);
     else setItems(data || []);
+    const { data: chatRows } = await supabase.rpc('my_conversations');
+    setChats((chatRows || []).filter((c) => c.landlord_id === uid));
     setLoading(false);
   }
 
@@ -159,7 +162,7 @@ export default function MyListings() {
         title: form.title.trim(),
         accommodation_type: form.accommodation_type,
         area_id: Number(form.area_id),
-        rooms: Number(form.rooms),
+        rooms: form.accommodation_type === 'Self Contain' ? 1 : Number(form.rooms),
         rent_amount: Number(form.rent_amount),
         rent_period: form.rent_period,
         description: form.description.trim(),
@@ -200,7 +203,9 @@ export default function MyListings() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm font-semibold">Room type
-            <select value={form.accommodation_type} onChange={(e) => setField('accommodation_type', e.target.value)} className={inputClass}>
+            <select value={form.accommodation_type}
+                    onChange={(e) => setForm((f) => ({ ...f, accommodation_type: e.target.value, rooms: e.target.value === 'Self Contain' ? 1 : f.rooms }))}
+                    className={inputClass}>
               {ROOM_TYPES.map((t) => <option key={t}>{t}</option>)}
             </select>
           </label>
@@ -223,7 +228,9 @@ export default function MyListings() {
             </select>
           </label>
           <label className="block text-sm font-semibold">Rooms
-            <input type="number" min="1" value={form.rooms} onChange={(e) => setField('rooms', e.target.value)} className={inputClass} />
+            <input type="number" min="1" max={form.accommodation_type === 'Self Contain' ? 1 : 10}
+                   disabled={form.accommodation_type === 'Self Contain'} value={form.accommodation_type === 'Self Contain' ? 1 : form.rooms}
+                   onChange={(e) => setField('rooms', e.target.value)} className={inputClass} />
           </label>
         </div>
 
@@ -323,6 +330,11 @@ export default function MyListings() {
           const cover = item.photos?.[0] || item.photo_url;
           const left = daysLeft(item.expires_at);
           const working = busy === item.id;
+          const roomChats = chats.filter((c) => Number(c.listing_id) === Number(item.id));
+          const unread = roomChats.reduce((n, c) => n + Number(c.unread || 0), 0);
+          const requests = roomChats.filter((c) => c.booking_status === 'PENDING').length;
+          const confirmed = roomChats.filter((c) => c.booking_status === 'CONFIRMED').length;
+          const chatLink = roomChats.length === 1 ? `/messages/${roomChats[0].id}` : '/messages';
 
           return (
             <article key={item.id} className="rounded-2xl border border-brand-100 bg-white p-5 shadow-sm">
@@ -351,6 +363,14 @@ export default function MyListings() {
                     <p className="mt-1 text-xs text-brand-900/60">Reviewed once your identity is approved and the proof is checked.</p>
                   )}
                   
+                  {roomChats.length > 0 && (
+                    <Link to={chatLink} className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-brand-50 p-2.5 text-xs font-semibold text-brand-700 hover:bg-brand-100">
+                      <span>💬 {roomChats.length} chat{roomChats.length === 1 ? '' : 's'}</span>
+                      {unread > 0 && <span className="rounded-full bg-brand-700 px-2 py-0.5 text-white">{unread} new</span>}
+                      {requests > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">{requests} viewing request{requests === 1 ? '' : 's'}</span>}
+                      {confirmed > 0 && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-800">{confirmed} confirmed</span>}
+                    </Link>
+                  )}
                   {item.status === 'REJECTED' && item.rejection_reason && (
                     <p className="mt-1 rounded-lg bg-red-50 p-2 text-xs text-red-700">Reason: {item.rejection_reason}</p>
                   )}

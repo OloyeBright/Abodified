@@ -18,6 +18,8 @@ const KIND = {
   rejected: { icon: '!', cls: 'bg-red-100 text-red-700' },
   expiring: { icon: '⏳', cls: 'bg-amber-100 text-amber-700' },
   report: { icon: '⚑', cls: 'bg-red-100 text-red-700' },
+  message: { icon: '💬', cls: 'bg-sky-100 text-sky-700' },
+  booking: { icon: '📅', cls: 'bg-amber-100 text-amber-700' },
 };
 
 function when(d) {
@@ -328,6 +330,11 @@ export default function Notifications() {
                   {n.kind === 'approved' && n.listing_id && (
                     <Link to={`/listing/${n.listing_id}`} className="mt-3 inline-block text-sm font-semibold text-brand-700 hover:text-brand-600">
                       View your room →
+                    </Link>
+                  )}
+                  {(n.kind === 'message' || n.kind === 'booking') && n.link && (
+                    <Link to={n.link} className="mt-3 inline-block rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600">
+                      {n.kind === 'booking' ? 'Open booking' : 'Open chat'}
                     </Link>
                   )}
                   {n.kind === 'report' && isAdmin && (

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { toWhatsApp, formatTag, periodLabel, distanceKm, formatDistance } from '../utils/helpers';
+import { formatTag, periodLabel, distanceKm, formatDistance } from '../utils/helpers';
 import Icon from '../components/Icon';
 import ReportListing from '../components/ReportListing';
 import PosterByline from '../components/PosterByline';
@@ -10,11 +10,11 @@ import PosterByline from '../components/PosterByline';
 const CAPTIONS = ['Main room', 'Toilet & bathroom', 'Kitchen & water', 'Compound & outside'];
 const CAPTION_BY_KEY = {
   room: 'Main room', bath: 'Toilet & bathroom', kitchen: 'Kitchen & water',
-  outside: 'Compound & outside', bedroom2: 'Second bedroom', parlour: 'Parlour',
+  outside: 'Compound & outside', bedroom2: 'Second bedroom', bedroom3: 'Third bedroom', parlour: 'Parlour',
 };
 
 function captionFor(url, index, total) {
-  const m = url && url.match(/-(room|bath|kitchen|outside|bedroom2|parlour)\.[a-z0-9]+(\?.*)?$/i);
+  const m = url && url.match(/-(room|bath|kitchen|outside|bedroom2|bedroom3|parlour)\.[a-z0-9]+(\?.*)?$/i);
   if (m) return CAPTION_BY_KEY[m[1].toLowerCase()];
   return total >= 4 ? CAPTIONS[index] || null : null;
 }
@@ -22,6 +22,66 @@ function captionFor(url, index, total) {
 // contact_number and exact_address are deliberately NOT selected here.
 const DETAIL_COLUMNS =
   'id, title, description, accommodation_type, rooms, rent_amount, rent_period, utilities, photo_url, photos, owner_id, poster_type, areas(name, lat, lng)';
+
+const BOOKING_LABEL = {
+  PENDING: 'Viewing requested',
+  CONFIRMED: 'Viewing confirmed',
+  DECLINED: 'Viewing declined',
+  CANCELLED: 'Viewing cancelled',
+};
+const BOOKING_CLS = {
+  PENDING: 'bg-amber-100 text-amber-800',
+  CONFIRMED: 'bg-emerald-100 text-emerald-800',
+  DECLINED: 'bg-red-100 text-red-700',
+  CANCELLED: 'bg-gray-200 text-gray-700',
+};
+
+// Shows this person's chats and viewing bookings for this room, right on the post
+function ChatPanel({ listingId, user, isOwner }) {
+  const [rows, setRows] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    supabase.rpc('my_conversations').then(({ data }) => {
+      if (alive) setRows((data || []).filter((r) => Number(r.listing_id) === Number(listingId)));
+    });
+    return () => { alive = false; };
+  }, [listingId, user.id]);
+
+  if (!rows || rows.length === 0) return null;
+
+  return (
+    <div className="mt-4 rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
+      <p className="text-sm font-bold">{isOwner ? 'Messages about this room' : 'Your chat about this room'}</p>
+      <div className="mt-2 space-y-2">
+        {rows.map((r) => {
+          const other = r.student_id === user.id ? r.landlord_name
+            : r.landlord_id === user.id ? r.student_name
+            : `${r.student_name} & ${r.landlord_name}`;
+          const open = r.booking_status === 'PENDING' || r.booking_status === 'CONFIRMED';
+          return (
+            <Link key={r.id} to={`/messages/${r.id}`}
+                  className="block rounded-xl bg-white p-3 text-sm shadow-sm hover:bg-brand-50">
+              <span className="flex items-center justify-between gap-2">
+                <span className="truncate font-semibold">{other}</span>
+                {r.unread > 0 && (
+                  <span className="shrink-0 rounded-full bg-brand-700 px-2 py-0.5 text-xs font-bold text-white">{r.unread} new</span>
+                )}
+              </span>
+              <span className="mt-0.5 block truncate text-brand-900/70">{r.last_message || 'No messages yet'}</span>
+              {open && (
+                <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${BOOKING_CLS[r.booking_status]}`}>
+                  {BOOKING_LABEL[r.booking_status]} ·{' '}
+                  {new Date(r.appointment_at).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function ListingDetail() {
   const { id } = useParams();
@@ -36,7 +96,6 @@ export default function ListingDetail() {
   const [dist, setDist] = useState({ state: 'idle', km: null });
   const [poster, setPoster] = useState(null);
   const [comments, setComments] = useState([]);
-  const [contacted, setContacted] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [commentMsg, setCommentMsg] = useState('');
   const [posting, setPosting] = useState(false);
@@ -63,16 +122,13 @@ export default function ListingDetail() {
     load();
   }, [id]);
 
-  // 2. Poster details, comments, and whether this student has already contacted the owner
+  // 2. Poster details, comments, and the chats for this room
   useEffect(() => {
     if (!listing) return;
     supabase.rpc('get_public_profile', { p_user: listing.owner_id }).then(({ data }) => {
       setPoster(Array.isArray(data) ? data[0] : data);
     });
     loadComments();
-    if (user) {
-      supabase.rpc('has_contacted_listing', { p_listing_id: listing.id }).then(({ data }) => setContacted(!!data));
-    }
   }, [listing?.id, user?.id]);
 
   async function loadComments() {
@@ -95,26 +151,15 @@ export default function ListingDetail() {
     );
   }, [listing]);
 
-  // 4. Get the number only when the button is clicked (this also records the contact)
+  // 4. Open an in-app chat with the owner. No phone number is ever sent to the browser.
   async function handleContact() {
     setContactError('');
     if (!user) return navigate('/login', { state: { from: { pathname: `/listing/${id}` } } });
-
-    const tab = window.open('about:blank', '_blank');
     setContacting(true);
-    const { data, error } = await supabase.rpc('get_listing_whatsapp', { p_listing_id: listing.id });
+    const { data, error } = await supabase.rpc('start_conversation', { p_listing_id: listing.id });
     setContacting(false);
-
-    if (error || !data) {
-      if (tab) tab.close();
-        return setContactError(error?.message || 'Could not open the chat. Please try again.');
-    }
-    setContacted(true);
-
-    const msg = encodeURIComponent(`Hello, I found "${listing.title}" on Abodified. Is it still available?`);
-    const url = `https://wa.me/${toWhatsApp(data)}?text=${msg}`;
-    if (tab) tab.location.href = url;
-    else window.location.href = url;
+    if (error || !data) return setContactError(error?.message || 'Could not open the chat. Please try again.');
+    navigate(`/messages/${data}`);
   }
 
   async function postComment(e) {
@@ -130,7 +175,7 @@ export default function ListingDetail() {
     });
     setPosting(false);
     if (error) {
-      if (error.code === '42501') return setCommentMsg('Contact the owner on WhatsApp first. Then you can ask a question here.');
+      if (error.code === '42501') return setCommentMsg('Save your profile first (open My profile). Then you can ask a question here.');
       return setCommentMsg(error.message);
     }
     setCommentText('');
@@ -159,7 +204,7 @@ export default function ListingDetail() {
   }
   const areaName = listing.areas?.name || 'Ikere Ekiti';
   const isOwner = !!user && user.id === listing.owner_id;
-  const canComment = !!user && (contacted || isOwner);
+  const canComment = !!user;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
@@ -254,7 +299,7 @@ export default function ListingDetail() {
           <section className="mt-6 rounded-3xl border border-brand-100 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-bold">Questions and answers</h2>
             <p className="text-sm text-brand-900/70">
-              Only students who have contacted the owner can ask here. The owner can answer.
+              Log in to ask a question. The owner can answer.
             </p>
 
             <div className="mt-4 space-y-3">
@@ -281,11 +326,6 @@ export default function ListingDetail() {
                   {posting ? 'Posting…' : 'Post'}
                 </button>
               </form>
-            )}
-            {user && !canComment && (
-              <p className="mt-4 rounded-xl bg-brand-50 p-3 text-sm text-brand-900/80">
-                To ask a question, first tap “Chat with owner on WhatsApp”. Then you can post here.
-              </p>
             )}
             {!user && (
               <p className="mt-4 text-sm text-brand-900/70">
@@ -320,18 +360,21 @@ export default function ListingDetail() {
               </div>
             )}
 
-            <button onClick={handleContact} disabled={contacting}
-                    className="mt-6 w-full rounded-xl bg-brand-700 py-3.5 font-semibold text-white hover:bg-brand-600 disabled:opacity-60">
-              {contacting ? 'Opening WhatsApp…' : user ? 'Chat with owner on WhatsApp' : 'Log in to chat with owner'}
-            </button>
-               {contactError && (
-                <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">
-                  {contactError}
-                  {/profile/i.test(contactError) && (
-                    <> <Link to="/settings" className="font-semibold underline">Set up my profile</Link></>
-                  )}
-                </p>
-              )}
+            {!isOwner && (
+              <button onClick={handleContact} disabled={contacting}
+                      className="mt-6 w-full rounded-xl bg-brand-700 py-3.5 font-semibold text-white hover:bg-brand-600 disabled:opacity-60">
+                {contacting ? 'Opening chat…' : user ? 'Message owner' : 'Log in to message owner'}
+              </button>
+            )}
+            {contactError && (
+              <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                {contactError}
+                {/profile/i.test(contactError) && (
+                  <> <Link to="/settings" className="font-semibold underline">Set up my profile</Link></>
+                )}
+              </p>
+            )}
+            {user && <ChatPanel listingId={listing.id} user={user} isOwner={isOwner} />}
             {poster?.user_id && (
               <Link to={`/u/${poster.user_id}`} className="mt-3 block text-center text-sm font-semibold text-brand-700 underline">
                 See the poster’s profile and reviews

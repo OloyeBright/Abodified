@@ -19,6 +19,7 @@ import MyListings from './pages/MyListings';
 import Profile from './pages/Profile';
 import Verify from './pages/Verify';
 import AdminUsers from './pages/AdminUsers';
+import Messages from './pages/Messages';
 
 
 function ScrollToTop() {
@@ -47,6 +48,8 @@ function AppRoutes() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/notifications" element={<Notifications />} />
+        <Route path="/messages" element={<Messages />} />
+        <Route path="/messages/:id" element={<Messages />} />
         <Route path="/my-listings" element={<MyListings />} />
         <Route path="/settings" element={<Profile />} />
         <Route path="/u/:id" element={<Profile />} />

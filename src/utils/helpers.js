@@ -93,3 +93,15 @@ export async function sha256Hex(file) {
   const hash = await crypto.subtle.digest('SHA-256', buf);
   return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
+
+// Pixel size of an image file, e.g. { w: 1600, h: 1200 }. Returns null if the browser cannot read it.
+export async function imageSize(file) {
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const size = { w: bmp.width, h: bmp.height };
+    if (bmp.close) bmp.close();
+    return size;
+  } catch (e) {
+    return null;
+  }
+}

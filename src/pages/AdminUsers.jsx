@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useConfirm } from '../components/ConfirmDialog';
 
@@ -20,6 +20,7 @@ export default function AdminUsers() {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(null);
   const [ask, dialog] = useConfirm();
+  const navigate = useNavigate();
 
   useEffect(() => {
     async function init() {
@@ -87,6 +88,14 @@ export default function AdminUsers() {
     if (error) return setNotice(error.message);
     setNotice(next ? 'Account suspended.' : 'Suspension lifted.');
     loadAll();
+  }
+
+  async function messageUser(u) {
+    setBusy(u.user_id);
+    const { data, error } = await supabase.rpc('admin_start_chat', { p_user: u.user_id });
+    setBusy(null);
+    if (error || !data) return setNotice(error?.message || 'Could not open the chat.');
+    navigate(`/messages/${data}`);
   }
 
   function emailOf(id) {
@@ -199,7 +208,13 @@ export default function AdminUsers() {
                   <td className="p-3">
                     {u.suspended ? <span className="font-semibold text-red-600">Suspended</span> : 'Active'}
                   </td>
-                  <td className="p-3">
+                  <td className="space-x-2 whitespace-nowrap p-3">
+                    {!u.is_admin && (
+                      <button disabled={busy === u.user_id} onClick={() => messageUser(u)}
+                              className="rounded-lg border border-brand-600 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 disabled:opacity-50">
+                        Message
+                      </button>
+                    )}
                     {!u.is_admin && (
                       <button disabled={busy === u.user_id} onClick={() => toggleSuspend(u)}
                               className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${

@@ -33,6 +33,17 @@ export default function Navbar() {
     if (user) countUnread();
   }, [location.pathname, user]);
 
+  // Keep the bell fresh: every 30 seconds, and right after a chat is read
+  useEffect(() => {
+    if (!user) return;
+    const t = setInterval(countUnread, 30000);
+    window.addEventListener('abodified:refresh-bell', countUnread);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('abodified:refresh-bell', countUnread);
+    };
+  }, [user?.id]);
+
   async function fetchUserRole(userId) {
     const { data } = await supabase.from('profiles').select('role').eq('id', userId).single();
     if (data) setRole(data.role);
@@ -68,6 +79,7 @@ export default function Navbar() {
         <nav className={`nav ${open ? 'nav--open' : ''}`} aria-label="Main navigation">
           <Link to="/browse">Browse</Link>
           {role === 'admin' && <Link to="/admin">Admin Dashboard</Link>}
+          {user && <Link to="/messages">Messages</Link>}
           {user && <Link to="/my-listings">My rooms</Link>}
           {user && <Link to="/settings">My profile</Link>}
 

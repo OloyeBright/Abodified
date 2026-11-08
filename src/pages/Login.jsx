@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
 const inputClass =
@@ -7,6 +7,7 @@ const inputClass =
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -20,7 +21,7 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setLoading(false);
     if (error) setErrorMsg(error.message);
-    else navigate('/');
+    else navigate(location.state?.from?.pathname || '/', { replace: true });
   }
 
   return (
