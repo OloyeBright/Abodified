@@ -21,11 +21,13 @@ const PHOTO_SLOTS = [
 ];
 const OPTIONAL_SLOTS = [
   { key: 'bedroom2', label: 'Second bedroom', hint: 'For 2-bedroom flats' },
+  { key: 'bedroom3', label: 'Third bedroom', hint: 'For bigger flats' },
   { key: 'parlour', label: 'Parlour', hint: 'The sitting room, if there is one' },
 ];
 const MAX_MB = 25;
 const MAX_UPLOAD_MB = 5;
 const MAX_PROOF_MB = 8;
+const MAX_ROOMS = 10;
 
 const inputClass =
   'mt-1 w-full rounded-xl border border-brand-100 bg-white px-4 py-3 outline-none focus:border-brand-600';
@@ -81,7 +83,10 @@ export default function PostListing() {
     description: '',
   });
   const [utilities, setUtilities] = useState({});
-  const [slots, setSlots] = useState({ room: null, bath: null, kitchen: null, outside: null, bedroom2: null, parlour: null });
+  const [slots, setSlots] = useState({
+    room: null, bath: null, kitchen: null, outside: null,
+    bedroom2: null, bedroom3: null, parlour: null,
+  });
   const [extras, setExtras] = useState([]);
   const [proofFile, setProofFile] = useState(null);
 
@@ -94,9 +99,19 @@ export default function PostListing() {
 
   const cleanNumber = normalizeNgNumber(form.contact_number);
   const isVerified = !!profile?.verified_until && new Date(profile.verified_until) > new Date();
+  const isSelfContain = form.accommodation_type === 'Self Contain';
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  // A self contain is always one room. Choosing it sets the count to 1.
+  function chooseRoomType(value) {
+    setForm((prev) => ({
+      ...prev,
+      accommodation_type: value,
+      rooms: value === 'Self Contain' ? 1 : prev.rooms,
+    }));
   }
 
   function handleNumber(e) {
@@ -137,8 +152,14 @@ export default function PostListing() {
     setErrorMsg('');
 
     if (!form.title.trim()) return setErrorMsg('Please enter a listing title.');
-    if (!form.accommodation_type) return setErrorMsg('Please choose a room type.');
+    if (!form.accommodation_type) return setErrorMsg('Please choose a room type. This is required.');
     if (!form.area_id) return setErrorMsg('Please choose an area.');
+
+    const roomCount = isSelfContain ? 1 : Number(form.rooms);
+    if (!Number.isInteger(roomCount) || roomCount < 1 || roomCount > MAX_ROOMS) {
+      return setErrorMsg(`Enter how many rooms there are, from 1 to ${MAX_ROOMS}.`);
+    }
+
     if (!proofFile) return setErrorMsg('Please upload proof that this house is yours. A rent receipt, a tenancy agreement, or a utility bill in your name.');
     if (proofFile.size > MAX_PROOF_MB * 1024 * 1024) return setErrorMsg(`The proof file must be under ${MAX_PROOF_MB}MB.`);
     if (!form.rent_amount || Number(form.rent_amount) <= 0) return setErrorMsg('Please enter the rent amount.');
@@ -194,7 +215,7 @@ export default function PostListing() {
       title: form.title.trim(),
       accommodation_type: form.accommodation_type,
       area_id: Number(form.area_id),
-      rooms: Number(form.rooms),
+      rooms: roomCount,
       rent_amount: Number(form.rent_amount),
       rent_period: form.rent_period,
       utilities,
@@ -329,16 +350,16 @@ export default function PostListing() {
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-semibold">Room type</label>
-            <select value={form.accommodation_type} onChange={(e) => update('accommodation_type', e.target.value)} className={inputClass}>
-              <option value="">Choose a room type…</option>
+            <label className="text-sm font-semibold">Room type <span className="text-red-600">*</span></label>
+            <select required value={form.accommodation_type} onChange={(e) => chooseRoomType(e.target.value)} className={inputClass}>
+              <option value="" disabled>Choose a room type…</option>
               {ROOM_TYPES.map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-sm font-semibold">Area</label>
-            <select value={form.area_id} onChange={(e) => update('area_id', e.target.value)} className={inputClass}>
-              <option value="">Choose an area…</option>
+            <label className="text-sm font-semibold">Area <span className="text-red-600">*</span></label>
+            <select required value={form.area_id} onChange={(e) => update('area_id', e.target.value)} className={inputClass}>
+              <option value="" disabled>Choose an area…</option>
               {areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </div>
@@ -359,7 +380,9 @@ export default function PostListing() {
           </div>
           <div>
             <label className="text-sm font-semibold">Rooms</label>
-            <input type="number" min="1" value={form.rooms} onChange={(e) => update('rooms', e.target.value)} className={inputClass} />
+            <input type="number" min="1" max={isSelfContain ? 1 : MAX_ROOMS} required={!isSelfContain} disabled={isSelfContain}
+                   value={isSelfContain ? 1 : form.rooms} onChange={(e) => update('rooms', e.target.value)} className={inputClass} />
+            {isSelfContain && <p className="mt-1 text-xs text-brand-900/60">A self contain is always 1 room.</p>}
           </div>
         </div>
 
