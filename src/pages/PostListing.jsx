@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { normalizeNgNumber, compressImage, sha256Hex, imageSize } from '../utils/helpers';
+import { normalizeNgNumber, compressImage, sha256Hex } from '../utils/helpers';
 
 const ROOM_TYPES = ['Single Room', 'Self Contain', 'Mini Flat', 'Room & Parlour'];
 
@@ -25,8 +25,7 @@ const OPTIONAL_SLOTS = [
   { key: 'parlour', label: 'Parlour', hint: 'The sitting room, if there is one' },
 ];
 const MAX_MB = 25;
-const MIN_EDGE = 900; // photos smaller than this look blurry on the room page
-const MAX_UPLOAD_MB = 5;
+const MAX_UPLOAD_MB = 12;
 const MAX_PROOF_MB = 8;
 const MAX_ROOMS = 10;
 
@@ -181,10 +180,6 @@ export default function PostListing() {
     for (const en of entries) {
       if (!en.file.type.startsWith('image/')) return setErrorMsg(`"${en.file.name}" is not an image.`);
       if (en.file.size > MAX_MB * 1024 * 1024) return setErrorMsg(`"${en.file.name}" is bigger than ${MAX_MB}MB.`);
-      const dim = await imageSize(en.file);
-      if (dim && Math.max(dim.w, dim.h) < MIN_EDGE) {
-        return setErrorMsg(`"${en.file.name}" is too small (${dim.w} x ${dim.h}) and will look blurry. Use a photo taken with your phone camera, at least ${MIN_EDGE} pixels wide.`);
-      }
     }
 
     setSubmitting(true);
@@ -409,7 +404,7 @@ export default function PostListing() {
 
         <div>
           <label className="text-sm font-semibold">
-            Exact address <span className="font-normal text-brand-900/50">(only admins see this)</span>
+            Exact address <span className="font-normal text-brand-900/50">(admins, and a student only after you confirm their viewing)</span>
           </label>
           <input value={form.exact_address} onChange={(e) => update('exact_address', e.target.value)}
                  placeholder="House number, street, landmark" className={inputClass} />

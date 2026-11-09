@@ -41,23 +41,23 @@ export function formatDistance(km) {
 }
 
 
-// REPLACE the old compressImage function in src/utils/helpers.js with this one.
-// It keeps the poster's original file whenever possible, so nothing is lost.
-// Only photos that are too big are shrunk, and they are saved at high quality.
-export async function compressImage(file, maxEdge = 2400, quality = 0.92) {
-  const MAX_BYTES = 5 * 1024 * 1024; // the upload limit used by the form
+// Keeps the photo at its full size, exactly as the camera took it.
+// It is re-saved once at high quality for one reason: this removes hidden data such as the GPS
+// location, so a photo can never reveal a house's exact position. Only photos larger than
+// maxEdge (4096 px, bigger than most phone cameras) are scaled down.
+export async function compressImage(file, maxEdge = 4096, quality = 0.95) {
   let bitmap;
   try {
-    // "from-image" keeps the photo the right way up
     bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   } catch (e) {
     return file; // the browser cannot read it: upload the original untouched
   }
 
   const fits = bitmap.width <= maxEdge && bitmap.height <= maxEdge;
-  if (fits && file.size <= MAX_BYTES) {
+  // PNG and WebP carry no camera location, so a normal-sized one is kept as it is
+  if (fits && (file.type === 'image/png' || file.type === 'image/webp')) {
     if (bitmap.close) bitmap.close();
-    return file; // already a good size: upload the original bytes, no re-encoding
+    return file;
   }
 
   try {
@@ -69,7 +69,7 @@ export async function compressImage(file, maxEdge = 2400, quality = 0.92) {
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';            // transparent PNGs get a white background
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, w, h);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
@@ -77,13 +77,12 @@ export async function compressImage(file, maxEdge = 2400, quality = 0.92) {
     if (bitmap.close) bitmap.close();
 
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
-    if (!blob || blob.size >= file.size) return file; // never make it bigger
+    if (!blob) return file;
     const name = file.name.replace(/\.[^.]+$/, '') + '.jpg';
     return new File([blob], name, { type: 'image/jpeg' });
   } catch (e) {
     return file;
   }
-
 }
 
 

@@ -250,7 +250,7 @@ export default function MyListings() {
           </div>
         </div>
 
-        <label className="block text-sm font-semibold">Exact address <span className="font-normal text-brand-900/50">(only admins see this)</span>
+        <label className="block text-sm font-semibold">Exact address <span className="font-normal text-brand-900/50">(admins, and a student only after you confirm their viewing)</span>
           <input value={form.exact_address} onChange={(e) => setField('exact_address', e.target.value)} className={inputClass} />
         </label>
 

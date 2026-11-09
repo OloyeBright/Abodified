@@ -52,6 +52,7 @@ export default function Messages() {
   const [note, setNote] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [address, setAddress] = useState('');
 
   const active = convos.find((c) => String(c.id) === String(id)) || null;
   const isStudent = !!user && !!active && active.student_id === user.id;
@@ -118,6 +119,13 @@ export default function Messages() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' });
   }, [messages.length, id]);
+
+  // The exact address is shown to the student only after the landlord confirms a viewing
+  const confirmedId = isStudent ? (bookings.find((b) => b.status === 'CONFIRMED')?.id || null) : null;
+  useEffect(() => {
+    if (!confirmedId) { setAddress(''); return; }
+    supabase.rpc('get_booking_address', { p_booking_id: confirmedId }).then(({ data }) => setAddress(data || ''));
+  }, [confirmedId]);
 
   async function send(e) {
     e.preventDefault();
@@ -319,6 +327,12 @@ export default function Messages() {
                         </span>
                         <p className="mt-1 text-sm font-semibold">{whenLong(openBooking.appointment_at)}</p>
                         {openBooking.note && <p className="text-xs text-brand-900/70">Note: {openBooking.note}</p>}
+                        {isStudent && openBooking.status === 'CONFIRMED' && address && (
+                          <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-sm font-semibold text-emerald-900">
+                            📍 Address: {address}
+                            <span className="block text-xs font-normal text-emerald-800">Shown only to you and the landlord.</span>
+                          </p>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {isLandlord && openBooking.status === 'PENDING' && (

@@ -98,6 +98,7 @@ export default function ListingDetail() {
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [commentMsg, setCommentMsg] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [posting, setPosting] = useState(false);
   const touchX = useRef(null);
 
@@ -107,6 +108,12 @@ export default function ListingDetail() {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user || null);
+      if (session?.user) {
+        const { data: prof } = await supabase.from('profiles').select('role').eq('id', session.user.id).maybeSingle();
+        setIsAdmin(prof?.role === 'admin');
+      } else {
+        setIsAdmin(false);
+      }
 
       const { data } = await supabase
         .from('listings')
@@ -160,6 +167,13 @@ export default function ListingDetail() {
     setContacting(false);
     if (error || !data) return setContactError(error?.message || 'Could not open the chat. Please try again.');
     navigate(`/messages/${data}`);
+  }
+
+  async function removeComment(commentId) {
+    if (!window.confirm('Delete this comment for everyone?')) return;
+    const { error } = await supabase.from('listing_comments').delete().eq('id', commentId);
+    if (error) return setCommentMsg(error.message);
+    loadComments();
   }
 
   async function postComment(e) {
@@ -299,7 +313,9 @@ export default function ListingDetail() {
           <section className="mt-6 rounded-3xl border border-brand-100 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-bold">Questions and answers</h2>
             <p className="text-sm text-brand-900/70">
-              Log in to ask a question. The owner can answer.
+              {user
+                ? 'Everyone can see these questions and answers. For private matters, use Message owner.'
+                : 'Log in to ask a question. The owner can answer.'}
             </p>
 
             <div className="mt-4 space-y-3">
@@ -310,6 +326,11 @@ export default function ListingDetail() {
                     <span className="font-bold text-brand-900">{c.author_name}</span>
                     {c.is_poster && <span className="rounded-full bg-sky-100 px-2 py-0.5 font-bold text-sky-800">Owner</span>}
                     <span className="text-brand-900/50">{new Date(c.created_at).toLocaleDateString('en-GB')}</span>
+                    {isAdmin && (
+                      <button type="button" onClick={() => removeComment(c.id)} className="ml-auto font-semibold text-red-600 hover:text-red-700">
+                        Delete
+                      </button>
+                    )}
                   </div>
                   <p className="mt-2 break-words text-sm text-brand-900/85">{c.body}</p>
                 </article>
@@ -321,6 +342,9 @@ export default function ListingDetail() {
                 <textarea rows={2} maxLength={400} value={commentText} onChange={(e) => setCommentText(e.target.value)}
                           placeholder={isOwner ? 'Answer a question…' : 'Ask a question about this room…'}
                           className="w-full rounded-xl border border-brand-100 bg-white px-4 py-3 outline-none focus:border-brand-600" />
+                <p className="text-xs text-brand-900/60">
+                  Do not share phone numbers, links or the exact address here. Use Message owner for private details.
+                </p>
                 <button type="submit" disabled={posting}
                         className="rounded-xl bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60">
                   {posting ? 'Posting…' : 'Post'}
