@@ -80,7 +80,7 @@ export default function Profile() {
     e.preventDefault();
     if (!agree) return setNotice('Please tick the box to confirm you understand it cannot be changed after saving.');
     if (form.display_name.trim().length < 2) return setNotice('Please enter your full name.');
-    if (!(signupType || form.account_type)) return setNotice('Choose Student, Agent or Landlord.');
+    if (!(signupType || form.account_type)) return setNotice('Choose Student or Landlord.');
     if (!file && !profile?.avatar_path) return setNotice('Please choose a profile picture.');
 
     setBusy(true);
@@ -124,7 +124,7 @@ export default function Profile() {
     setBusy(false);
     if (error) {
       if (error.code === '23505') return setNotice('You have already reviewed this poster.');
-      if (error.code === '42501') return setNotice('Contact this poster on WhatsApp first. Then you can leave a review.');
+      if (error.code === '42501') return setNotice('You can review this poster after a viewing they confirmed has taken place.');
       return setNotice(error.message);
     }
     setReviewText('');
@@ -178,6 +178,7 @@ export default function Profile() {
               {locked && <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">Verified profile</span>}
             </div>
             {profile?.bio && <p className="mt-2 text-base text-brand-900/80">{profile.bio}</p>}
+            {profile?.account_type === 'LANDLORD' && (
             <div className="mt-4 grid grid-cols-3 gap-3 text-center">
               <div className="rounded-xl bg-brand-50 p-3">
                 <p className="text-xl font-extrabold">{profile?.live_rooms ?? 0}</p>
@@ -192,7 +193,8 @@ export default function Profile() {
                 <p className="text-xs text-brand-900/70">Reviews</p>
               </div>
             </div>
-            {own && locked && (
+            )}
+            {own && locked && profile?.account_type === 'LANDLORD' && (
               <Link to="/my-listings" className="mt-4 inline-block text-sm font-semibold text-brand-700 underline">View my rooms</Link>
             )}
           </div>
@@ -286,7 +288,7 @@ export default function Profile() {
         </section>
       )}
 
-      {/* ---------- Review form (students who have contacted this poster) ---------- */}
+      {/* ---------- Review form (students with a confirmed viewing that has passed) ---------- */}
       {!own && me && contacted && (
         <section className="mt-6 space-y-4 rounded-3xl border border-brand-100 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-bold">Leave a review</h2>
@@ -310,6 +312,12 @@ export default function Profile() {
             </button>
           </form>
         </section>
+      )}
+
+      {!own && me && !contacted && (
+        <p className="mt-6 rounded-2xl bg-brand-50 p-4 text-sm text-brand-900/80">
+          You can leave a review after a viewing with this poster has been confirmed and the date has passed.
+        </p>
       )}
 
       {/* ---------- Reviews ---------- */}
