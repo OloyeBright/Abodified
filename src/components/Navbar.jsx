@@ -9,6 +9,7 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
+  const [accountType, setAccountType] = useState(null);
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
@@ -22,7 +23,7 @@ export default function Navbar() {
       const u = session?.user || null;
       setUser(u);
       if (u) fetchUserRole(u.id);
-      else { setRole(null); setUnread(0); }
+      else { setRole(null); setAccountType(null); setUnread(0); }
     });
 
     return () => listener.subscription.unsubscribe();
@@ -45,8 +46,8 @@ export default function Navbar() {
   }, [user?.id]);
 
   async function fetchUserRole(userId) {
-    const { data } = await supabase.from('profiles').select('role').eq('id', userId).single();
-    if (data) setRole(data.role);
+    const { data } = await supabase.from('profiles').select('role, account_type').eq('id', userId).single();
+    if (data) { setRole(data.role); setAccountType(data.account_type); }
   }
 
   async function countUnread() {
@@ -80,12 +81,14 @@ export default function Navbar() {
           <Link to="/browse">Browse</Link>
           {role === 'admin' && <Link to="/admin">Admin Dashboard</Link>}
           {user && <Link to="/messages">Messages</Link>}
-          {user && <Link to="/my-listings">My rooms</Link>}
+          {user && accountType === 'LANDLORD' && <Link to="/my-listings">My rooms</Link>}
           {user && <Link to="/settings">My profile</Link>}
 
-          <Link to="/post-listing" className="btn btn--secondary">
-            Post a Room <Icon name="plus" size={18} />
-          </Link>
+          {(!user || accountType === 'LANDLORD') && (
+            <Link to="/post-listing" className="btn btn--secondary">
+              Post a Room <Icon name="plus" size={18} />
+            </Link>
+          )}
 
           {user ? (
             <>
