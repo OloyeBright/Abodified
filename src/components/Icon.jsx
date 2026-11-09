@@ -17,6 +17,13 @@ const icons = {
   more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
   close: <path d="m6 6 12 12M18 6 6 18" />,
   alert: <><path d="M12 9v4m0 4h.01" /><path d="M10.3 3.6 2.5 18a2 2 0 0 0 1.8 3h15.4a2 2 0 0 0 1.8-3L13.7 3.6a2 2 0 0 0-3.4 0Z" /></>,
+  chevron: <path d="m6 9 6 6 6-6" />,
+  logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></>,
+  message: <path d="M4 5h16v11H9l-5 4V5Z" />,
+  list: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
+  users: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6" /></>,
+  dashboard: <><rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" /><rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" /></>,
+  flag: <><path d="M5 21V4" /><path d="M5 4h12l-2 4 2 4H5" /></>,
 };
 
 export default function Icon({ name, size = 20 }) {
@@ -27,4 +34,3 @@ export default function Icon({ name, size = 20 }) {
     </svg>
   );
 }
-

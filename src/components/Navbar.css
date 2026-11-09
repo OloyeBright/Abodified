@@ -1,0 +1,77 @@
+/* Avatar dropdown. Loaded by Navbar.jsx, so nothing needs pasting into index.css. */
+
+.user-menu { position: relative; }
+
+.user-menu__trigger {
+  position: relative; display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px 3px 3px; border: 2px solid var(--ink); border-radius: 999px;
+  background: #fff; cursor: pointer; transition: background .15s;
+}
+.user-menu__trigger:hover { background: var(--sun-soft); }
+.user-menu__chev { display: grid; place-items: center; transition: transform .2s; }
+.user-menu__trigger[aria-expanded="true"] .user-menu__chev { transform: rotate(180deg); }
+.user-menu__dot {
+  position: absolute; top: -4px; right: -4px; width: 13px; height: 13px;
+  border: 2px solid #fff; border-radius: 50%; background: var(--accent);
+}
+
+.user-menu__avatar {
+  width: 34px; height: 34px; flex: none; display: grid; place-items: center; overflow: hidden;
+  border-radius: 50%; background: var(--primary-pale); color: var(--primary);
+  font-size: 12px; font-weight: 800;
+}
+.user-menu__avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.user-menu__panel {
+  display: none; position: absolute; top: calc(100% + 10px); right: 0; z-index: 60;
+  width: 280px; padding: 8px; border: 2px solid var(--ink); border-radius: 16px;
+  background: #fff; box-shadow: 5px 5px 0 var(--ink); transform-origin: top right;
+}
+.user-menu__panel--open { display: block; animation: user-menu-in .16s ease-out; }
+@keyframes user-menu-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } }
+
+.user-menu__head {
+  display: flex; align-items: center; gap: 11px; margin-bottom: 6px;
+  padding: 10px 10px 13px; border-bottom: 1px solid var(--line);
+}
+.user-menu__head .user-menu__avatar { width: 44px; height: 44px; font-size: 14px; }
+.user-menu__who { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.user-menu__who strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.user-menu__who small { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.user-menu__badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.user-menu__badge {
+  padding: 2px 8px; border-radius: 999px; background: var(--primary-pale); color: var(--primary);
+  font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+}
+.user-menu__badge--admin { background: var(--sun); color: var(--ink); }
+
+.user-menu__item {
+  width: 100%; min-height: 44px; display: flex; align-items: center; gap: 11px; padding: 0 10px;
+  border: 0; border-radius: 10px; background: none; color: var(--ink);
+  font-size: 14px; font-weight: 600; text-align: left; text-decoration: none; cursor: pointer;
+}
+.user-menu__item:hover, .user-menu__item:focus-visible { background: var(--primary-pale); }
+.user-menu__item .icon { color: var(--primary); }
+.user-menu__item--nudge { margin-bottom: 4px; background: var(--butter); }
+.user-menu__item--nudge .icon { color: var(--accent-dark); }
+.user-menu__item--danger { color: var(--red); }
+.user-menu__item--danger .icon { color: var(--red); }
+.user-menu__item--danger:hover { background: var(--red-bg); }
+.user-menu__section {
+  margin: 8px 0 2px; padding: 0 10px; color: var(--muted);
+  font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+}
+.user-menu__sep { height: 1px; margin: 6px 4px; background: var(--line); }
+
+/* Phones: the hamburger panel already acts as the dropdown, so show the account list inline */
+@media (max-width: 900px) {
+  .user-menu__trigger { display: none; }
+  .user-menu__panel {
+    display: block; position: static; width: auto; padding: 6px 0 0; border: 0;
+    border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-menu__panel--open { animation: none; }
+}

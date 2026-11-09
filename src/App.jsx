@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import Navbar from './components/Navbar';
 import BackBar from './components/BackBar';
 import ErrorBoundary from './components/ErrorBoundary';
-import AccountTypeGate from './components/AccountTypeGate';
 import Home from './pages/Home';
 import Browse from './pages/Browse';
 import PostListing from './pages/PostListing';
@@ -67,7 +66,6 @@ export default function App() {
       <ScrollToTop />
       <Navbar />
       <BackBar />
-      <AccountTypeGate />
       <AppRoutes />
     </Router>
   );
